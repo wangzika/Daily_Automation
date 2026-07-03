@@ -9,7 +9,7 @@ from pathlib import Path
 from .arxiv_client import ArxivClient
 from .assets import ensure_article_assets
 from .article import build_digest, build_html, build_title, write_outputs
-from .config import DEFAULT_OUTPUT_DIR, TOPICS
+from .config import DEFAULT_OUTPUT_DIR, TOPICS, arxiv_query_from_keywords, parse_keyword_text, topic_from_keywords
 from .notify import describe_notification_result, notify_draft_created, notify_publish_issue
 from .recommender import recommend
 from .sample_data import SAMPLE_PAPERS
@@ -20,12 +20,22 @@ from .wechat import WeChatConfig, WeChatPublisher, WeChatPublisherError
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     issue_date = date.fromisoformat(args.issue_date) if args.issue_date else date.today()
+    keywords = parse_keyword_text(args.keywords)
+    if keywords:
+        custom_topic = topic_from_keywords(keywords)
+        search_queries = [custom_topic.query]
+        scoring_topics = (custom_topic, *TOPICS)
+        print(f"Using custom paper keywords: {', '.join(keywords)}")
+        print(f"Custom arXiv query: {arxiv_query_from_keywords(keywords)}")
+    else:
+        search_queries = [topic.query for topic in TOPICS]
+        scoring_topics = TOPICS
 
     if args.sample:
         papers = SAMPLE_PAPERS
     else:
         client = ArxivClient(retries=args.arxiv_retries, retry_delay_seconds=args.arxiv_retry_delay)
-        papers = client.search_many([topic.query for topic in TOPICS], max_results_per_query=args.per_topic)
+        papers = client.search_many(search_queries, max_results_per_query=args.per_topic)
 
     if args.semantic_scholar == "on" and not args.sample:
         print(f"Enriching up to {args.quality_enrich_limit} papers with Semantic Scholar metadata.")
@@ -36,7 +46,7 @@ def main(argv: list[str] | None = None) -> int:
             delay_seconds=args.semantic_scholar_delay,
         )
 
-    recommendations = recommend(papers, limit=args.limit, days_back=args.days_back)
+    recommendations = recommend(papers, limit=args.limit, days_back=args.days_back, topics=scoring_topics)
     if not recommendations:
         print("No matching papers found.", file=sys.stderr)
         return 2
@@ -136,6 +146,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--issue-date", help="Override issue date, format YYYY-MM-DD.")
     parser.add_argument("--publish-mode", choices=("none", "draft", "publish"), default=None)
+    parser.add_argument(
+        "--keywords",
+        default=os.getenv("DIGEST_KEYWORDS", ""),
+        help="Comma/semicolon separated paper keywords. When set, arXiv search is driven by these keywords.",
+    )
     parser.add_argument("--sample", action="store_true", help="Use bundled sample papers instead of querying arXiv.")
     parser.add_argument(
         "--semantic-scholar",

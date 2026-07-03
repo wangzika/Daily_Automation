@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 
 
 PROJECT_TITLE = "每日 GNSS 欺骗检测 / 多模态融合 / SLAM 论文推荐"
@@ -77,3 +78,40 @@ TOPICS: tuple[TopicProfile, ...] = (
 
 
 DEFAULT_OUTPUT_DIR = Path("outputs")
+
+
+def parse_keyword_text(value: str | None) -> tuple[str, ...]:
+    if not value:
+        return ()
+    parts = re.split(r"[,;，；\n]+", value)
+    return tuple(dict.fromkeys(part.strip() for part in parts if part.strip()))
+
+
+def arxiv_query_from_keywords(keywords: tuple[str, ...]) -> str:
+    terms = [_arxiv_all_term(keyword) for keyword in keywords if keyword.strip()]
+    if not terms:
+        return ""
+    return "(" + " OR ".join(terms) + ")"
+
+
+def topic_from_keywords(keywords: tuple[str, ...]) -> TopicProfile:
+    weights: dict[str, float] = {}
+    for keyword in keywords:
+        keyword = " ".join(keyword.lower().split())
+        if keyword:
+            weights[keyword] = 9.0 if " " in keyword or "-" in keyword else 6.0
+    return TopicProfile(
+        name="custom_keywords",
+        cn_name="邮件指定关键词",
+        query=arxiv_query_from_keywords(keywords),
+        keywords=weights,
+    )
+
+
+def _arxiv_all_term(keyword: str) -> str:
+    cleaned = " ".join(keyword.replace('"', " ").split())
+    if not cleaned:
+        return ""
+    if " " in cleaned or "-" in cleaned:
+        return f'all:"{cleaned}"'
+    return f"all:{cleaned}"

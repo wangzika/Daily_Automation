@@ -42,17 +42,19 @@ def recommend(
     limit: int,
     days_back: int,
     now: datetime | None = None,
+    topics: tuple[TopicProfile, ...] | None = None,
 ) -> list[RecommendedPaper]:
     now = now or datetime.now(timezone.utc)
+    topics = topics or TOPICS
     recent = [paper for paper in papers if _age_days(paper, now) <= days_back]
     candidates = _deduplicate_papers(recent or papers)
-    ranked = [_score_paper(paper, now) for paper in candidates]
+    ranked = [_score_paper(paper, now, topics) for paper in candidates]
     ranked.sort(key=lambda item: (item.score, item.paper.published), reverse=True)
 
     selected: list[RecommendedPaper] = []
     selected_ids: set[str] = set()
 
-    for topic in TOPICS:
+    for topic in topics:
         topic_candidates = [
             item
             for item in ranked
@@ -82,12 +84,12 @@ def recommend(
     return selected
 
 
-def _score_paper(paper: Paper, now: datetime) -> RecommendedPaper:
+def _score_paper(paper: Paper, now: datetime, topics: tuple[TopicProfile, ...]) -> RecommendedPaper:
     haystack = f"{paper.title} {paper.abstract}".lower()
     topic_scores: dict[str, float] = {}
     matched_terms: list[str] = []
 
-    for topic in TOPICS:
+    for topic in topics:
         score, terms = _score_topic(haystack, topic)
         if score:
             topic_scores[topic.cn_name] = score

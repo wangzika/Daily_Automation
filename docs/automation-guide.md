@@ -44,6 +44,8 @@
 | `scripts/publish_now.sh` | 生成每日推荐文章，并按模式创建公众号草稿或提交发布 |
 | `scripts/generate_deepdives.sh` | 生成单篇论文解读文章，并按模式创建公众号草稿或提交发布 |
 | `scripts/generate_weekly_summary.sh` | 生成每周热点方向汇总 |
+| `scripts/process_email_commands.sh` | 手动读取邮箱里的论文生成指令 |
+| `scripts/install_email_command_launchd.sh` | 安装定时读取邮箱指令的 launchd 任务 |
 | `scripts/upload_cover_to_wechat.py` | 上传公众号封面素材，并写入 `.env` |
 | `scripts/make_wechat_cover.py` | 制作公众号封面图 |
 
@@ -273,7 +275,94 @@ EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES=1
 EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES=0
 ```
 
-## 10. 输出文件和日志
+## 10. 邮件指令控制
+
+除了每日定时任务，也可以通过邮件临时指定关键词，让系统按当前方案生成一组定制论文推荐和论文解读。
+
+### 10.1 开启邮件指令
+
+`.env` 中配置：
+
+```bash
+EMAIL_COMMAND_ENABLED=1
+EMAIL_COMMAND_IMAP_HOST=imap.qq.com
+EMAIL_COMMAND_IMAP_PORT=993
+EMAIL_COMMAND_USERNAME=your@email.com
+EMAIL_COMMAND_PASSWORD=your_imap_authorization_code
+EMAIL_COMMAND_ALLOWED_SENDERS=your@email.com
+EMAIL_COMMAND_SUBJECT_KEYWORD=论文指令
+EMAIL_COMMAND_DEFAULT_MODE=draft
+EMAIL_COMMAND_DEFAULT_TASKS=digest,deepdive
+EMAIL_COMMAND_POLL_INTERVAL=300
+EMAIL_COMMAND_GIT_PUSH=1
+```
+
+QQ 邮箱通常使用授权码，不是网页登录密码。如果 `EMAIL_COMMAND_USERNAME` / `EMAIL_COMMAND_PASSWORD` 没有单独设置，脚本会尝试复用 `SMTP_USERNAME` / `SMTP_PASSWORD`。
+
+安装“每 5 分钟检查一次邮箱”的定时器：
+
+```bash
+./scripts/install_email_command_launchd.sh 300
+```
+
+手动检查一次邮箱指令：
+
+```bash
+./scripts/process_email_commands.sh
+```
+
+### 10.2 邮件怎么写
+
+邮件必须满足两个条件：
+
+- 发件人在 `EMAIL_COMMAND_ALLOWED_SENDERS` 里。
+- 邮件主题包含 `EMAIL_COMMAND_SUBJECT_KEYWORD`，默认是 `论文指令`。
+
+推荐邮件格式：
+
+```text
+主题：论文指令：GNSS 干扰与鲁棒定位
+
+关键词：GNSS jamming, spoofing detection, robust localization
+任务：digest, deepdive
+模式：draft
+数量：5
+解读数量：3
+检索天数：180
+```
+
+字段说明：
+
+| 字段 | 作用 |
+| --- | --- |
+| `关键词` | 指定 arXiv 检索关键词，逗号或分号分隔 |
+| `任务` | `digest` 生成推荐；`deepdive` 生成论文解读；`weekly` 生成周报 |
+| `模式` | `none`、`draft`、`publish`，默认 `draft` |
+| `数量` | 推荐文章收录论文数量 |
+| `解读数量` | 单篇论文解读数量 |
+| `检索天数` | arXiv 检索结果的时间窗口 |
+
+脚本会把邮件指令的输出放到：
+
+```text
+outputs/email_commands/<运行时间>/
+```
+
+并在执行完成后发一封总结邮件，列出关键词、执行步骤、输出目录和结果码。
+
+### 10.3 支持的任务写法
+
+`任务` 可以用英文或中文：
+
+| 写法 | 等价任务 |
+| --- | --- |
+| `digest`、`daily`、`日报`、`推荐` | 生成关键词推荐文章 |
+| `deepdive`、`paper`、`解读`、`论文解读` | 生成单篇论文解读 |
+| `weekly`、`week`、`周报` | 生成周报 |
+
+如果只写 `任务：deepdive`，系统会自动先跑 `digest`，因为论文解读需要先有推荐列表 JSON。
+
+## 11. 输出文件和日志
 
 每日推荐文章输出在：
 
@@ -306,9 +395,16 @@ outputs/logs/launchd.out.log
 outputs/logs/launchd.err.log
 ```
 
-## 11. 常见问题
+邮件指令日志输出在：
 
-### 11.1 改了 `.env` 时间，为什么没有按新时间跑？
+```text
+outputs/logs/email-commands.out.log
+outputs/logs/email-commands.err.log
+```
+
+## 12. 常见问题
+
+### 12.1 改了 `.env` 时间，为什么没有按新时间跑？
 
 因为 `.env` 只是项目配置，系统定时任务已经被写入 `~/Library/LaunchAgents/`。改完 `.env` 后，需要重新运行：
 
@@ -316,7 +412,7 @@ outputs/logs/launchd.err.log
 ./scripts/install_daily_launchd.sh
 ```
 
-### 11.2 微信接口报 IP 白名单错误怎么办？
+### 12.2 微信接口报 IP 白名单错误怎么办？
 
 微信公众号 API 要求当前公网 IP 在公众号后台的 IP 白名单中。报错类似：
 
@@ -326,7 +422,7 @@ invalid ip xxx.xxx.xxx.xxx, not in whitelist
 
 解决方式是在公众号后台的“安全中心 / IP 白名单”里加入当前脚本运行机器的公网 IP。
 
-### 11.3 launchd 报 Operation not permitted 怎么办？
+### 12.3 launchd 报 Operation not permitted 怎么办？
 
 如果日志里出现：
 
@@ -346,7 +442,7 @@ Operation not permitted
 ./scripts/install_daily_launchd.sh HH:MM
 ```
 
-### 11.4 为什么没有直接正式发布？
+### 12.4 为什么没有直接正式发布？
 
 当前默认是 `draft` 模式，只创建草稿，不正式发布。这样更安全，可以先人工检查排版、封面和图片。
 
@@ -359,7 +455,7 @@ AUTOMATION_DEEPDIVE_MODE=publish
 
 但前提是公众号账号具备 `freepublish` 接口权限。
 
-### 11.5 怎么确认定时任务已经安装？
+### 12.5 怎么确认定时任务已经安装？
 
 重新运行安装脚本后，如果看到类似输出，说明已经安装：
 
@@ -374,7 +470,7 @@ Schedule: daily at 20:45
 launchctl kickstart -k gui/$(id -u)/com.codex.daily-gnss-slam-digest
 ```
 
-### 11.6 GitHub 没有提交怎么办？
+### 12.6 GitHub 没有提交怎么办？
 
 检查以下配置：
 
