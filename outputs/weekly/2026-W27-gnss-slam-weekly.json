@@ -110,7 +110,7 @@
       "title": "AUSLUN: A Fixed-Hover UAV--USV System for GNSS-Denied Maritime Search and Navigation",
       "url": "http://arxiv.org/abs/2606.29875v1",
       "published": "2026-06-29",
-      "score": 68.92,
+      "score": 68.89,
       "quality_score": 14.0,
       "quality_signals": {
         "venue": "NAVIGATION",
@@ -138,7 +138,7 @@
       "title": "DL-VINS-Factory: A Modular Framework for Learned Visual Front-Ends in Visual-Inertial SLAM",
       "url": "http://arxiv.org/abs/2607.01757v1",
       "published": "2026-07-02",
-      "score": 68.17,
+      "score": 68.14,
       "quality_score": 8.5,
       "quality_signals": {
         "code_url": "https://github.com/limshoonkit/DL-VINS-Factory-ROS2",
@@ -164,7 +164,7 @@
       "title": "LXD-SLAM: LiDAR+X Dense SLAM with $\\sum_{i=0}^{5}C_5^i$ Configurable Sensor Combinations",
       "url": "http://arxiv.org/abs/2606.27811v1",
       "published": "2026-06-26",
-      "score": 112.2,
+      "score": 112.17,
       "quality_score": 8.0,
       "quality_signals": {
         "code_url": "https://github.com/peterWon/LXD-SLAM",
@@ -199,7 +199,7 @@
       "title": "GNSS Jamming Detection with Automatic Gain Control (AGC) and Carrier-to-Noise Ratio Density (CNO) Observables from a COTS receiver",
       "url": "http://arxiv.org/abs/2602.12688v1",
       "published": "2026-02-13",
-      "score": 56.05,
+      "score": 56.04,
       "quality_score": 0.0,
       "quality_signals": {
         "venue": "7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany"
@@ -224,7 +224,7 @@
       "title": "Self-supervised Geometry Reasoning for LiDAR Simultaneous Localization and Mapping",
       "url": "http://arxiv.org/abs/2606.30166v1",
       "published": "2026-06-29",
-      "score": 51.46,
+      "score": 51.43,
       "quality_score": 0.0,
       "quality_signals": {},
       "quality_summary": "质量分 0.0；暂无外部质量元数据",
@@ -247,7 +247,7 @@
       "title": "AUSLUN: A Fixed-Hover UAV--USV System for GNSS-Denied Maritime Search and Navigation",
       "url": "http://arxiv.org/abs/2606.29875v1",
       "published": "2026-06-29",
-      "score": 68.92,
+      "score": 68.89,
       "quality_score": 14.0,
       "quality_signals": {
         "venue": "NAVIGATION",
@@ -275,7 +275,7 @@
       "title": "DL-VINS-Factory: A Modular Framework for Learned Visual Front-Ends in Visual-Inertial SLAM",
       "url": "http://arxiv.org/abs/2607.01757v1",
       "published": "2026-07-02",
-      "score": 68.17,
+      "score": 68.14,
       "quality_score": 8.5,
       "quality_signals": {
         "code_url": "https://github.com/limshoonkit/DL-VINS-Factory-ROS2",
@@ -301,7 +301,7 @@
       "title": "LXD-SLAM: LiDAR+X Dense SLAM with $\\sum_{i=0}^{5}C_5^i$ Configurable Sensor Combinations",
       "url": "http://arxiv.org/abs/2606.27811v1",
       "published": "2026-06-26",
-      "score": 112.2,
+      "score": 112.17,
       "quality_score": 8.0,
       "quality_signals": {
         "code_url": "https://github.com/peterWon/LXD-SLAM",
@@ -338,7 +338,7 @@
       "title": "AUSLUN: A Fixed-Hover UAV--USV System for GNSS-Denied Maritime Search and Navigation",
       "url": "http://arxiv.org/abs/2606.29875v1",
       "published": "2026-06-29",
-      "score": 68.92,
+      "score": 68.89,
       "quality_score": 14.0,
       "quality_signals": {
         "venue": "NAVIGATION",
@@ -366,7 +366,7 @@
       "title": "GNSS Jamming Detection with Automatic Gain Control (AGC) and Carrier-to-Noise Ratio Density (CNO) Observables from a COTS receiver",
       "url": "http://arxiv.org/abs/2602.12688v1",
       "published": "2026-02-13",
-      "score": 56.05,
+      "score": 56.04,
       "quality_score": 0.0,
       "quality_signals": {
         "venue": "7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany"
