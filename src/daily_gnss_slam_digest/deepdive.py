@@ -28,6 +28,9 @@ class DeepDiveFigure:
 @dataclass(frozen=True)
 class PaperReading:
     abstract: str
+    introduction: str
+    method: str
+    experiments: str
     conclusion: str
     captions: tuple[str, ...]
 
@@ -42,6 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     created: list[Path] = []
     draft_ids: list[str] = []
+    cover_media_ids: list[str] = []
     publish_results: list[dict[str, Any]] = []
     publish_failed = False
     publish_blocked_reason: str | None = None
@@ -69,6 +73,8 @@ def main(argv: list[str] | None = None) -> int:
         figures = _extract_figures(pdf_path, paper_dir, captions, max_figures=args.figures)
         if not figures:
             figures = _render_fallback_figures(pdf_path, paper_dir, max_figures=args.figures)
+        cover_figure = _select_cover_figure(figures)
+        figures = _move_cover_first(figures, cover_figure)
 
         local_image_map = {f"figure_{i}": figure.path.name for i, figure in enumerate(figures, start=1)}
         markdown = build_deepdive_markdown(paper, reading, figures, local_image_map)
@@ -82,6 +88,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Wrote deep dive: {html_path}")
 
         if publisher and access_token:
+            cover_media_id = None
+            if cover_figure and os.getenv("DEEPDIVE_PAPER_COVER", "1").lower() not in {"0", "false", "no", "off"}:
+                try:
+                    cover_result = publisher.upload_permanent_image(access_token, cover_figure.path)
+                    cover_media_id = str(cover_result.get("media_id") or "")
+                    if cover_media_id:
+                        cover_media_ids.append(cover_media_id)
+                        print(f"Uploaded paper cover media_id: {cover_media_id}")
+                except WeChatPublisherError as exc:
+                    print(f"Paper cover upload failed, using default cover: {exc}", file=sys.stderr)
             image_urls = {
                 f"figure_{i}": publisher.upload_article_image(access_token, figure.path)
                 for i, figure in enumerate(figures, start=1)
@@ -94,6 +110,7 @@ def main(argv: list[str] | None = None) -> int:
                 content_html=wechat_html,
                 digest=_digest(paper),
                 content_source_url=paper.get("url"),
+                thumb_media_id=cover_media_id,
             )
             draft_ids.append(media_id)
             print(f"Created WeChat deep-dive draft media_id: {media_id}")
@@ -162,6 +179,7 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "articles": [str(path) for path in created],
                 "draft_media_ids": draft_ids,
+                "cover_media_ids": cover_media_ids,
                 "publish_results": publish_results,
             },
             ensure_ascii=False,
@@ -186,7 +204,8 @@ def build_deepdive_markdown(
     lines = [
         f"# {title}",
         "",
-        f"- 作者：{_authors(paper)}",
+        f"- 作者：{_commentary_author()}",
+        f"- 论文作者：{_authors(paper)}",
         f"- 日期：{paper.get('published', '')[:10]}",
         f"- 原文：{paper.get('url', '')}",
         "",
@@ -198,9 +217,13 @@ def build_deepdive_markdown(
         "",
         *_markdown_bullets(_source_clues(paper, reading)),
         "",
-        "## 这篇论文应该怎么读",
+        "## 故事版导读",
         "",
-        "一篇工程型定位/SLAM 论文，不能只看模型名字和最终指标。建议按七步读：背景痛点、研究问题、输入观测、核心方法、图表证据、局限追问、工程迁移。",
+        _story_intro(paper, reading),
+        "",
+        "## 按章节讲论文",
+        "",
+        *_chapter_markdown(_chapter_walkthrough(paper, reading)),
         "",
         "## 1. 背景与痛点",
         "",
@@ -265,7 +288,8 @@ def build_deepdive_html(
         '<section style="max-width:677px;margin:0 auto;color:#24343a;font-family:-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif;">',
         f'<h1 style="margin:0 0 14px;color:#10272f;font-size:24px;line-height:1.38;font-weight:800;">{html.escape(title)}</h1>',
         '<section style="margin:0 0 18px;padding:15px 16px;background:#f5fbfa;border-left:4px solid #25d8b8;color:#33484f;font-size:14px;line-height:1.9;">',
-        f"作者：{html.escape(_authors(paper))}<br/>",
+        f"作者：{html.escape(_commentary_author())}<br/>",
+        f"论文作者：{html.escape(_authors(paper))}<br/>",
         f"日期：{html.escape(str(paper.get('published', ''))[:10])}<br/>",
         f'原文：<a href="{html.escape(paper.get("url", ""))}" style="color:#0b9984;text-decoration:none;">{html.escape(paper.get("url", ""))}</a>',
         "</section>",
@@ -273,8 +297,10 @@ def build_deepdive_html(
         _paragraph(_one_sentence(paper, reading)),
         _section_title("原文线索"),
         _numbered_cards(_source_clues(paper, reading)),
-        _section_title("这篇论文应该怎么读"),
-        _paragraph("一篇工程型定位/SLAM 论文，不能只看模型名字和最终指标。建议按七步读：背景痛点、研究问题、输入观测、核心方法、图表证据、局限追问、工程迁移。"),
+        _section_title("故事版导读"),
+        _paragraph(_story_intro(paper, reading)),
+        _section_title("按章节讲论文"),
+        _chapter_cards(_chapter_walkthrough(paper, reading)),
         _section_title("1. 背景与痛点"),
         _numbered_cards(_problem_context(paper, reading)),
         _section_title("2. 研究问题"),
@@ -348,9 +374,30 @@ def _build_reading(pdf_path: Path, captions: list[str]) -> PaperReading:
     abstract = _extract_section(text, ("abstract",), ("keywords", "index terms", "1 introduction", "i. introduction", "introduction"))
     if not abstract:
         abstract = _extract_section(text, ("introduction",), ("related work", "method", "methodology", "approach", "preliminaries", "interference signal", "system overview", "materials"))
+    introduction = _extract_section(
+        text,
+        ("introduction",),
+        ("related work", "background", "preliminaries", "method", "methodology", "approach", "system overview", "proposed method"),
+        max_chars=1800,
+    )
+    method = _extract_section(
+        text,
+        ("method", "methodology", "approach", "proposed method", "system overview", "framework", "algorithm", "materials and methods", "interference signal"),
+        ("experiment", "experiments", "evaluation", "results", "implementation", "discussion", "conclusion"),
+        max_chars=2200,
+    )
+    experiments = _extract_section(
+        text,
+        ("experiment", "experiments", "experimental setup", "evaluation", "results", "performance evaluation", "implementation"),
+        ("discussion", "conclusion", "conclusions", "references", "acknowledgment", "acknowledgements"),
+        max_chars=2200,
+    )
     return PaperReading(
         abstract=abstract,
-        conclusion=_extract_section(text, ("conclusion", "conclusions", "discussion"), ("references", "acknowledgment", "acknowledgements")),
+        introduction=introduction,
+        method=method,
+        experiments=experiments,
+        conclusion=_extract_section(text, ("conclusion", "conclusions", "discussion"), ("references", "acknowledgment", "acknowledgements"), max_chars=1600),
         captions=tuple(captions),
     )
 
@@ -365,10 +412,10 @@ def _extract_pdf_text(pdf_path: Path) -> str:
         )
     except (OSError, subprocess.CalledProcessError):
         return ""
-    return _clean_text(result.stdout)
+    return result.stdout
 
 
-def _extract_section(text: str, starts: tuple[str, ...], ends: tuple[str, ...]) -> str:
+def _extract_section(text: str, starts: tuple[str, ...], ends: tuple[str, ...], max_chars: int = 1200) -> str:
     if not text:
         return ""
     lowered = text.lower()
@@ -389,7 +436,7 @@ def _extract_section(text: str, starts: tuple[str, ...], ends: tuple[str, ...]) 
             end_pos = start_pos + match.start()
             break
     section = text[start_pos:end_pos]
-    return _clean_text(section)[:1200]
+    return _clean_text(section)[:max_chars]
 
 
 def _extract_figures(pdf_path: Path, output_dir: Path, captions: list[str], max_figures: int) -> list[DeepDiveFigure]:
@@ -473,7 +520,58 @@ def _ink_ratio(image: Image.Image) -> float:
 
 
 def _caption_for(captions: list[str], index: int) -> str:
+    if 0 <= index - 1 < len(captions):
+        return captions[index - 1]
     return f"论文原图 {index}（从 PDF 直接提取）"
+
+
+def _select_cover_figure(figures: list[DeepDiveFigure]) -> DeepDiveFigure | None:
+    if not figures:
+        return None
+    return max(figures, key=_cover_score)
+
+
+def _move_cover_first(figures: list[DeepDiveFigure], cover: DeepDiveFigure | None) -> list[DeepDiveFigure]:
+    if not cover:
+        return figures
+    return [cover, *(figure for figure in figures if figure.path != cover.path)]
+
+
+def _cover_score(figure: DeepDiveFigure) -> float:
+    caption = figure.caption.lower()
+    score = 0.0
+    for term in (
+        "framework",
+        "architecture",
+        "pipeline",
+        "overview",
+        "system",
+        "workflow",
+        "flow",
+        "method",
+        "network",
+        "diagram",
+        "overview",
+        "proposed",
+        "框架",
+        "流程",
+        "结构",
+        "系统",
+    ):
+        if term in caption:
+            score += 20.0
+    try:
+        with Image.open(figure.path) as image:
+            width, height = image.size
+    except OSError:
+        return score
+    ratio = width / max(height, 1)
+    area = width * height
+    if 1.2 <= ratio <= 2.8:
+        score += 8.0
+    if 500_000 <= area <= 2_800_000:
+        score += 4.0
+    return score
 
 
 def _one_sentence(paper: dict[str, Any], reading: PaperReading | None = None) -> str:
@@ -485,6 +583,157 @@ def _one_sentence(paper: dict[str, Any], reading: PaperReading | None = None) ->
     if {"slam", "odometry", "mapping"} & terms:
         return "这篇论文的核心是把局部几何、匹配约束或地图表达做得更可靠，从而改进 SLAM/里程计在复杂几何、稀疏点云或退化场景下的状态估计。"
     return "这篇论文适合从问题定义、观测设计、约束建模和工程可迁移性四个角度快速阅读。"
+
+
+def _story_intro(paper: dict[str, Any], reading: PaperReading) -> str:
+    terms = set(paper.get("matched_terms", []))
+    title = paper["title"]
+    if {"spoofing", "jamming", "interference"} & terms:
+        return (
+            f"可以把《{title}》想成一个“定位系统值班员”的故事：系统平时相信 GNSS，"
+            "但一旦有人开始干扰或欺骗，最终经纬度跳变往往已经是后果。作者想做的是把告警提前，"
+            "从接收机内部的 AGC、C/N0、检测量这些细小变化里，判断信号环境是不是开始不对劲。"
+            f"{_section_hint(reading.abstract, '摘要')}"
+        )
+    if {"fusion", "multi-sensor", "multimodal"} & terms:
+        return (
+            f"《{title}》讲的是一个多传感器团队协作的故事：LiDAR、相机、IMU、GNSS 各自都有长处，"
+            "也都会在某些场景里掉链子。论文关心的不是把传感器堆得越多越好，而是当某个传感器失效、"
+            "某段场景退化或 GNSS 不可靠时，系统还能不能用同一套逻辑继续定位和建图。"
+            f"{_section_hint(reading.abstract, '摘要')}"
+        )
+    return (
+        f"《{title}》可以当成一个“机器人怎样不迷路”的故事：前端看到的是稀疏、嘈杂、动态的世界，"
+        "后端却需要输出连续、可信的轨迹和地图。作者的切入点通常是让几何表示、匹配约束或地图更新更稳，"
+        "减少一个局部错误一路放大成全局漂移。"
+        f"{_section_hint(reading.abstract, '摘要')}"
+    )
+
+
+def _chapter_walkthrough(paper: dict[str, Any], reading: PaperReading) -> list[tuple[str, str]]:
+    terms = set(paper.get("matched_terms", []))
+    if {"spoofing", "jamming", "interference"} & terms:
+        fallback_method = (
+            "方法章通常先搭建可控的 GNSS 干扰/欺骗场景，再把接收机输出的 AGC、C/N0 或检测器响应拉到同一时间轴上。"
+            "通俗地说，它不是直接问“位置有没有错”，而是先问“接收机是不是已经开始用力自救”。"
+        )
+        fallback_exp = (
+            "实验章的重点是把干扰区间和观测曲线对齐：弱干扰时谁先响应，强干扰时谁稳定触发，正常波动时谁更不容易误报。"
+            "这决定了它能不能进入真实完整性监测链路。"
+        )
+    elif {"fusion", "multi-sensor", "multimodal"} & terms:
+        fallback_method = (
+            "方法章通常在讲传感器如何分工：IMU 给短时运动先验，LiDAR/视觉给几何约束，GNSS 给全局约束。"
+            "真正的看点是这些约束如何进入滤波器、因子图或后端优化，以及系统如何给不可靠观测降权。"
+        )
+        fallback_exp = (
+            "实验章要重点看传感器缺失、GNSS denied、几何退化和跨场景测试。只在所有传感器都正常时表现好，"
+            "还不能说明系统能上真实平台。"
+        )
+    else:
+        fallback_method = (
+            "方法章通常解释作者怎样重新组织局部几何、匹配关系或地图表达。通俗地说，"
+            "它是在告诉 SLAM 系统哪些点更可信、哪些约束更该相信，以及怎样避免错误匹配拖垮整条轨迹。"
+        )
+        fallback_exp = (
+            "实验章需要把轨迹误差、地图质量、消融实验和失败案例一起看。平均误差下降当然重要，"
+            "但更关键的是退化场景里是否更稳。"
+        )
+
+    return [
+        (
+            "摘要：先把故事讲成一句话",
+            _section_narrative(
+                reading.abstract,
+                "摘要通常先交代问题、方法和结论。读这篇时，可以先抓三个词：它面对什么定位风险，用什么观测或模型解决，最后用什么实验说明有效。",
+            ),
+        ),
+        (
+            "引言：为什么这个问题非做不可",
+            _section_narrative(
+                reading.introduction,
+                "引言部分是在搭舞台：真实系统里 GNSS 会被遮挡、欺骗或干扰，传感器会退化，SLAM 会漂移。作者要说服读者，这不是一个漂亮数据集上的小修小补，而是部署时迟早会撞上的问题。",
+            ),
+        ),
+        (
+            "方法：作者真正搭了哪台机器",
+            _section_narrative(reading.method, fallback_method),
+        ),
+        (
+            "实验：证据链是否站得住",
+            _section_narrative(reading.experiments, fallback_exp),
+        ),
+        (
+            "结论：论文留下了什么边界",
+            _section_narrative(
+                reading.conclusion,
+                "结论部分要反过来看：作者承认了哪些边界，哪些场景还没覆盖，哪些模块以后还要加强。工程读者最该带走的不是一个分数，而是它能迁移到自己系统里的哪一层。",
+            ),
+        ),
+    ]
+
+
+def _chapter_markdown(chapters: list[tuple[str, str]]) -> list[str]:
+    lines: list[str] = []
+    for index, (title, body) in enumerate(chapters, start=1):
+        lines.extend([f"### {index}. {title}", "", body, ""])
+    return lines
+
+
+def _chapter_cards(chapters: list[tuple[str, str]]) -> str:
+    cards = []
+    for index, (title, body) in enumerate(chapters, start=1):
+        cards.append(
+            '<section style="margin:0 0 12px;padding:14px 15px;background:#f7fbfb;'
+            'border:1px solid #e0eeee;border-radius:8px;">'
+            f'<p style="margin:0 0 8px;color:#0b9984;font-size:14px;font-weight:800;">{index}. {html.escape(title)}</p>'
+            f'<p style="margin:0;color:#40545c;font-size:14px;line-height:1.9;">{html.escape(body)}</p>'
+            "</section>"
+        )
+    return "".join(cards)
+
+
+def _section_narrative(section_text: str, fallback: str) -> str:
+    if not section_text:
+        return fallback
+    keywords = _keyword_hits(
+        section_text,
+        (
+            "GNSS",
+            "GPS",
+            "AGC",
+            "CNO",
+            "LiDAR",
+            "visual",
+            "camera",
+            "inertial",
+            "IMU",
+            "SLAM",
+            "odometry",
+            "mapping",
+            "detection",
+            "jamming",
+            "spoofing",
+            "fusion",
+            "robust",
+            "dataset",
+            "benchmark",
+            "experiment",
+        ),
+    )
+    keyword_text = f"文中这一段反复出现的线索是 {', '.join(keywords[:6])}。" if keywords else ""
+    return (
+        f"{fallback}"
+        f"{keyword_text}"
+        "把它翻成工程语言，就是先确认输入观测是否可信，再看这些观测如何变成约束、告警或地图更新，最后看实验有没有覆盖真实失败模式。"
+    )
+
+
+def _section_hint(section_text: str, label: str) -> str:
+    keywords = _keyword_hits(section_text, ("GNSS", "AGC", "CNO", "LiDAR", "visual", "inertial", "SLAM", "odometry", "mapping", "detection", "jamming", "spoofing", "fusion", "robust"))
+    if not keywords:
+        return ""
+    return f" 从{label}抽取到的线索看，后文会围绕 {', '.join(keywords[:5])} 展开。"
 
 
 def _problem_context(paper: dict[str, Any], reading: PaperReading) -> list[str]:
@@ -673,6 +922,8 @@ def _followup_questions(paper: dict[str, Any]) -> list[str]:
 def _figure_reading(paper: dict[str, Any], reading: PaperReading, figure: DeepDiveFigure, index: int) -> str:
     caption = figure.caption.lower()
     terms = set(paper.get("matched_terms", []))
+    if "setup" in caption or "framework" in caption or "architecture" in caption or "system" in caption or "overview" in caption or "pipeline" in caption:
+        return "这张图适合当作论文的“主地图”来读：左侧通常是传感器或数据输入，中间是同步、融合、检测、建图或优化模块，右侧是定位、地图或告警输出。读它时不要急着看细节，先沿着箭头走一遍数据流，就能知道作者到底把创新点放在前端观测、后端优化，还是系统组织方式上。"
     if {"spoofing", "jamming", "interference"} & terms:
         if index == 1:
             return "把这张图当成“观测量响应图”来读：干扰发生时，接收机前端的 AGC、C/N0 或检测量会出现同步变化。阅读重点不是曲线本身，而是变化是否清晰、是否和干扰区间对齐、弱干扰时是否仍能被看见。"
@@ -687,8 +938,6 @@ def _figure_reading(paper: dict[str, Any], reading: PaperReading, figure: DeepDi
         return "这张图更适合看结果验证：轨迹是否贴近真值、迭代是否收敛、地图或局部结构是否因为新模块变得更稳定。"
     if "agc" in caption or "cno" in caption or "detection" in caption:
         return "读这张图时不要只看曲线是否变化，而要把变化和干扰发生区间对齐：AGC 的突降、C/N0 的下降或检测脉冲，分别代表接收机前端增益控制、卫星信号质量和检测器输出。真正有价值的是弱干扰下谁先响应、谁漏检。"
-    if "setup" in caption or "framework" in caption or "architecture" in caption or "system" in caption:
-        return "这类图要按数据流读：左侧通常是传感器或数据输入，中间是同步、融合、检测或优化模块，右侧是定位、建图或告警输出。判断可复用性时，重点看哪些模块依赖特定硬件，哪些模块可以替换。"
     if "map" in caption or "mapping" in caption or "trajectory" in caption or "odometry" in caption:
         return "这类图要同时看轨迹和地图：轨迹是否闭合、地图是否重影、转弯和长走廊是否漂移。漂亮的可视化不等于鲁棒，最好结合数值指标和失败案例一起判断。"
     if index == 1:
@@ -701,6 +950,10 @@ def _authors(paper: dict[str, Any]) -> str:
     if len(authors) <= 4:
         return ", ".join(authors)
     return ", ".join(authors[:4]) + " 等"
+
+
+def _commentary_author() -> str:
+    return os.getenv("WECHAT_AUTHOR", "波波机器人")
 
 
 def _wechat_title(paper: dict[str, Any]) -> str:
@@ -762,7 +1015,7 @@ def _evidence_sentence(reading: PaperReading, fallback: str) -> str:
             keywords.append(token)
     if not keywords:
         return fallback
-    return f"从摘要和图注线索看，论文反复围绕 {', '.join(dict.fromkeys(keywords)[:5])} 展开，说明这些量就是阅读时应优先跟踪的主线。"
+    return f"从摘要和图注线索看，论文反复围绕 {', '.join(list(dict.fromkeys(keywords))[:5])} 展开，说明这些量就是阅读时应优先跟踪的主线。"
 
 
 def _keyword_hits(text: str, candidates: tuple[str, ...]) -> list[str]:

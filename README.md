@@ -52,7 +52,7 @@ cp .env.example .env
 - `WECHAT_APP_ID`: 公众号 AppID。
 - `WECHAT_APP_SECRET`: 公众号 AppSecret。
 - `WECHAT_THUMB_MEDIA_ID`: 图文封面素材 `media_id`，微信草稿接口必填。
-- `WECHAT_AUTHOR`: 文章作者名，默认 `GNSS Paper Bot`。
+- `WECHAT_AUTHOR`: 文章作者名，默认 `波波机器人`。
 - `WECHAT_PUBLISH_MODE`: `none`、`draft` 或 `publish`。
 
 运行时加载 `.env`：
@@ -139,6 +139,8 @@ PYTHONPATH=src python scripts/upload_cover_to_wechat.py outputs/wechat-cover-gns
 ```bash
 ./scripts/generate_deepdives.sh draft
 ```
+
+论文解读会按“故事导读、章节讲解、方法拆解、图解、实验、局限、工程复现”展开；`DEEPDIVE_PAPER_COVER=1` 时，会优先从论文 PDF 里挑 framework / architecture / pipeline / system 等流程图或框架图作为公众号草稿封面，并把这张图放到正文主图位置。
 
 确认草稿后也可以提交发布：
 

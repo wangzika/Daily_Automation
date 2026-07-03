@@ -23,7 +23,7 @@ class WeChatConfig:
     app_secret: str
     thumb_media_id: str
     base_url: str = DEFAULT_BASE_URL
-    author: str = "GNSS Paper Bot"
+    author: str = "波波机器人"
     need_open_comment: int = 0
     only_fans_can_comment: int = 0
 
@@ -49,7 +49,7 @@ class WeChatConfig:
             app_secret=app_secret,
             thumb_media_id=thumb_media_id or "",
             base_url=os.getenv("WECHAT_BASE_URL", DEFAULT_BASE_URL).rstrip("/"),
-            author=os.getenv("WECHAT_AUTHOR", "GNSS Paper Bot"),
+            author=os.getenv("WECHAT_AUTHOR", "波波机器人"),
             need_open_comment=int(os.getenv("WECHAT_COMMENT_OPEN", "0")),
             only_fans_can_comment=int(os.getenv("WECHAT_COMMENT_FANS_ONLY", "0")),
         )
@@ -82,13 +82,14 @@ class WeChatPublisher:
         content_html: str,
         digest: str,
         content_source_url: str | None = None,
+        thumb_media_id: str | None = None,
     ) -> str:
         article: dict[str, Any] = {
             "title": title[:64],
             "author": self.config.author,
             "digest": digest[:120],
             "content": content_html,
-            "thumb_media_id": self.config.thumb_media_id,
+            "thumb_media_id": thumb_media_id or self.config.thumb_media_id,
             "need_open_comment": self.config.need_open_comment,
             "only_fans_can_comment": self.config.only_fans_can_comment,
         }
