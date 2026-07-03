@@ -200,7 +200,7 @@ def build_deepdive_markdown(
     figures: list[DeepDiveFigure],
     image_map: dict[str, str],
 ) -> str:
-    title = f"论文解读｜{paper['title']}"
+    title = _article_title(paper)
     chapters = _chapter_walkthrough(paper, reading)
     lines = [
         f"# {title}",
@@ -261,7 +261,7 @@ def build_deepdive_html(
     figures: list[DeepDiveFigure],
     image_map: dict[str, str],
 ) -> str:
-    title = f"论文解读｜{paper['title']}"
+    title = _article_title(paper)
     chapters = _chapter_walkthrough(paper, reading)
     parts = [
         '<section style="max-width:677px;margin:0 auto;color:#24343a;font-family:-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif;">',
@@ -558,7 +558,7 @@ def _one_sentence(paper: dict[str, Any], reading: PaperReading | None = None) ->
 
 def _story_intro(paper: dict[str, Any], reading: PaperReading) -> str:
     terms = set(paper.get("matched_terms", []))
-    title = paper["title"]
+    title = _display_title(paper)
     if {"spoofing", "jamming", "interference"} & terms:
         return (
             f"可以把《{title}》想成一个“定位系统值班员”的故事：系统平时相信 GNSS，"
@@ -575,7 +575,7 @@ def _story_intro(paper: dict[str, Any], reading: PaperReading) -> str:
         )
     return (
         f"《{title}》可以当成一个“机器人怎样不迷路”的故事：前端看到的是稀疏、嘈杂、动态的世界，"
-        "后端却需要输出连续、可信的轨迹和地图。作者的切入点通常是让几何表示、匹配约束或地图更新更稳，"
+        "后端却需要输出连续、可信的轨迹和地图。作者把切入点放在几何表示、匹配约束和地图更新的稳定性上，"
         "减少一个局部错误一路放大成全局漂移。"
         f"{_section_hint(reading.abstract, '摘要')}"
     )
@@ -585,45 +585,50 @@ def _chapter_walkthrough(paper: dict[str, Any], reading: PaperReading) -> list[t
     terms = set(paper.get("matched_terms", []))
     if {"spoofing", "jamming", "interference"} & terms:
         fallback_intro = (
-            "引言部分通常先说明 GNSS 为什么会从“可靠全局位置”变成风险源：信号弱、环境复杂、攻击门槛下降，"
-            "都会让最终 PVT 结果来不及承担第一道告警。"
+            "这篇论文从铁路自动化定位讲起：GNSS 正被用于 ATO、移动闭塞、虚拟编组等安全相关场景，"
+            "但 jamming 和 spoofing 会在接收机完成定位解算前先污染信号环境。作者把问题前移到接收机观测层，"
+            "希望用 AGC 和 C/N0 这类在线可读状态量提前发现干扰。"
         )
         fallback_method = (
-            "方法章通常先搭建可控的 GNSS 干扰/欺骗场景，再把接收机输出的 AGC、C/N0 或检测器响应拉到同一时间轴上。"
-            "通俗地说，它不是直接问“位置有没有错”，而是先问“接收机是不是已经开始用力自救”。"
+            "方法路线很清楚：先构造线性 chirp 干扰，再和真实 GPS L1 回放信号合路，最后用 COTS 接收机同时记录 AGC gain 和 C/N0。"
+            "AGC 检测看前端增益是否低于无干扰基线阈值，C/N0 检测看多颗卫星的载噪比是否同步下跌；两条检测链再和已知干扰时间段对齐比较。"
         )
         fallback_exp = (
-            "实验章的重点是把干扰区间和观测曲线对齐：弱干扰时谁先响应，强干扰时谁稳定触发，正常波动时谁更不容易误报。"
-            "这决定了它能不能进入真实完整性监测链路。"
+            "实验把预录的铁路沿线 IQ 数据在 GPS L1 上回放，并在多个 30 秒干扰区间逐步提高 chirp 功率。"
+            "真正要看的不是曲线是否好看，而是每一段干扰开始后 AGC/C/N0 谁先响应、谁漏检、谁在恢复阶段产生误报。"
         )
-        fallback_conclusion = "结论部分要看检测边界：接收机状态量能提前暴露异常，但它还需要和融合定位、完整性监测一起工作。"
+        fallback_conclusion = "结论给出的边界也很实用：AGC 对输入功率变化敏感，C/N0 会受卫星几何、多路径和环境影响；两者最好组合成可信度，而不是单独承担完整性判断。"
     elif {"fusion", "multi-sensor", "multimodal"} & terms:
         fallback_intro = (
-            "引言部分通常在解释真实平台为什么不能只依赖单一传感器：GNSS 会失锁，视觉会退化，LiDAR 会遇到几何不足，"
-            "IMU 又会随时间漂移。"
+            "LXD-SLAM 盯住的是机器人部署里的一个硬问题：平台上可能有 LiDAR、相机、IMU、轮速计、GNSS，"
+            "但不同机器人、不同任务、不同环境拿到的传感器组合并不一样。作者把 3D LiDAR 作为核心锚点，"
+            "再让其它模态以可插拔方式加入同一套估计和建图框架。"
         )
         fallback_method = (
-            "方法章通常在讲传感器如何分工：IMU 给短时运动先验，LiDAR/视觉给几何约束，GNSS 给全局约束。"
-            "真正的看点是这些约束如何进入滤波器、因子图或后端优化，以及系统如何给不可靠观测降权。"
+            "方法由三层咬合起来：前端用 IESKF 做统一状态估计，预测阶段按可用传感器选择 IMU、轮速计或恒速模型；"
+            "更新阶段以 LiDAR 点到 mesh 的距离为主约束，视觉可用时再加入重投影误差。地图层用多层 GP sub-mesh 表达连续表面，"
+            "后端再用 ESC、视觉 Bidirectional PnP、GNSS/odometry 约束放进混合位姿图，修正长期漂移。"
         )
         fallback_exp = (
-            "实验章要重点看传感器缺失、GNSS denied、几何退化和跨场景测试。只在所有传感器都正常时表现好，"
-            "还不能说明系统能上真实平台。"
+            "实验需要按传感器组合逐组读：作者声称最多支持 32 种组合，所以证据不只是一条最优轨迹，"
+            "而是不同配置下是否能接近或超过专用 SOTA，并且能实时输出全局一致的稠密 mesh。"
         )
-        fallback_conclusion = "结论部分要看系统边界：多传感器组合越灵活，同步、标定、计算资源和长期维护压力也越大。"
+        fallback_conclusion = "结论的价值在于把模块化、统一滤波、稠密 mesh 和多模态回环连到一起；边界也很明显，组合越灵活，对标定、同步、算力和地图维护的要求越高。"
     else:
         fallback_intro = (
-            "引言部分通常从 SLAM 的老问题切入：局部匹配一旦不稳，误差就会一路传到后端优化，最后表现为轨迹漂移和地图重影。"
+            "这篇论文从 LiDAR SLAM 的局部几何瓶颈切入：稀疏点云、低线数 LiDAR 和噪声会让手工估计的协方差、对应关系、表面结构变得不稳定，"
+            "前端一旦给出脏约束，后端轨迹和地图都会被拖偏。"
         )
         fallback_method = (
-            "方法章通常解释作者怎样重新组织局部几何、匹配关系或地图表达。通俗地说，"
-            "它是在告诉 SLAM 系统哪些点更可信、哪些约束更该相信，以及怎样避免错误匹配拖垮整条轨迹。"
+            "方法把每个点看成一个带协方差的高斯分布，用神经模块预测局部几何，再用符号推理模块检查两类一致性："
+            "对应点残差是否能被协方差解释，协方差诱导出的位姿是否和 SLAM 记忆中的位姿一致。"
+            "随后把推理后的几何反馈给 SLAM，更新轨迹和对应关系，形成几何和轨迹互相修正的闭环。"
         )
         fallback_exp = (
-            "实验章需要把轨迹误差、地图质量、消融实验和失败案例一起看。平均误差下降当然重要，"
-            "但更关键的是退化场景里是否更稳。"
+            "实验把 KITTI Sequence 00 降采样成 64、32、16 线 LiDAR 设置，用 VGICP 作为后端，比较原始点云和几何推理后点云。"
+            "读实验时要同时看 300 帧区间 RPE、全局配准成功率和稀疏输入下的收益，因为这决定它是否真的帮 SLAM 抗退化。"
         )
-        fallback_conclusion = "结论部分要看可迁移性：新增几何模块是否能离开原数据集、原传感器配置，仍然稳定改善定位和建图。"
+        fallback_conclusion = "结论把贡献收束到“无真值标签学习局部几何”上；限制也很清楚，训练时间、采样策略和停止准则还会影响它能否广泛接入工程系统。"
 
     return [
         (
@@ -728,7 +733,7 @@ def _section_hint(section_text: str, label: str) -> str:
 
 def _problem_context(paper: dict[str, Any], reading: PaperReading) -> list[str]:
     terms = set(paper.get("matched_terms", []))
-    title = paper["title"]
+    title = _display_title(paper)
     if {"spoofing", "jamming", "interference"} & terms:
         return [
             "GNSS 在铁路、无人系统和车载定位里常被当作全局位置来源，但它面对干扰、欺骗和遮挡时很脆弱；只看最终位置跳变，往往已经太晚。",
@@ -738,11 +743,11 @@ def _problem_context(paper: dict[str, Any], reading: PaperReading) -> list[str]:
     if {"fusion", "multi-sensor", "multimodal"} & terms:
         return [
             "多传感器融合的难点不是把 LiDAR、相机、IMU、GNSS 都接进系统，而是在不同场景下知道哪些观测可信、哪些观测应该降权或剔除。",
-            "GNSS 受限、几何退化、动态物体和跨会话环境变化都会破坏单一传感器假设，因此论文通常要证明系统在这些不完美条件下仍能闭环工作。",
+            "GNSS 受限、几何退化、动态物体和跨会话环境变化都会破坏单一传感器假设，因此论文需要证明系统在这些不完美条件下仍能闭环工作。",
             f"从题目《{title}》看，重点不只是单点精度，而是传感器组合、可配置性和大场景一致建图能力。",
         ]
     return [
-        "SLAM/里程计论文的背景通常是：前端几何估计不稳定会一路传导到后端优化，最后表现为漂移、错配或地图撕裂。",
+        "SLAM/里程计的老问题是：前端几何估计不稳定会一路传导到后端优化，最后表现为漂移、错配或地图撕裂。",
         "复杂几何、低分辨率 LiDAR、稀疏区域和动态场景会让手工几何估计变得脆弱，因此作者往往试图让局部几何或匹配约束更可靠。",
         f"从题目《{title}》看，这篇论文适合重点关注它如何定义局部几何、如何训练/估计，以及它是否真的改善 SLAM 轨迹和地图质量。",
     ]
@@ -799,23 +804,26 @@ def _method_points(paper: dict[str, Any], reading: PaperReading) -> list[str]:
     terms = set(paper.get("matched_terms", []))
     if {"spoofing", "jamming", "interference"} & terms:
         return [
-            "输入层：构造或回放 GNSS 信号，并叠加可控干扰；同时记录接收机输出的 C/N0、AGC gain 等内部状态量。",
-            "检测层：把 AGC/CNO 的变化转成事件边界或检测标志，核心是判断这些变化是否和干扰区间一致。",
-            "对比层：分别评估 AGC-based detector、CNO-based detector 的响应差异，看低功率干扰、强干扰和不同时间段下的漏检情况。",
-            "工程层：最值得借鉴的是“先检测观测可信度，再决定 GNSS 是否参与定位融合”的思路。",
+            "信号链路：用 SNCF 铁路沿线预录 IQ 数据回放 GPS L1，再把线性 chirp 干扰通过 RF combiner 合进去，让干扰发生时间和强度都可控。",
+            "接收机观测：Septentrio AsteRx SBi3 同步输出 MeasEpoch 里的 C/N0 和 ReceiverStatus 里的 AGC gain，避免只看最终经纬度跳变。",
+            "AGC 检测：先用无干扰样本估计均值和标准差，再用 `mu_ref - 3 sigma_ref - T_drop` 构造阈值；文中 `T_drop=2 dB`，观测值跌破阈值就触发告警。",
+            "C/N0 检测：看多颗卫星的 C/N0 是否同时低于预设阈值；这条链对真实信号质量更直观，但在弱干扰和恢复阶段更容易受跟踪环路影响。",
+            "工程接入：这套方法最适合输出 GNSS 可信度分数，再交给 INS/视觉/LiDAR 融合后端调协方差或剔除观测。",
         ]
     if {"fusion", "multi-sensor", "multimodal"} & terms:
         return [
-            "输入层：系统通常接收 LiDAR、视觉、IMU、GNSS 等异构数据；第一步是时间同步、外参标定和异常观测筛除。",
-            "估计层：论文的关键通常在滤波器、因子图或后端优化中，把不同观测写成可统一处理的约束。",
-            "退化处理：真正要看的不是传感器都正常时的表现，而是 GNSS 缺失、视觉退化、LiDAR 几何不足时系统如何降级。",
-            "地图层：如果论文强调 dense mapping 或 cross-session localization，就要看地图表达是否支持长期维护和跨场景复用。",
+            "可配置输入：系统以 3D LiDAR 为核心，额外支持 Camera、IMU、Wheel Encoder、GNSS；五类模态构成 power set，因此标题里的组合数是 32。",
+            "预测层：IESKF 的预测不是固定公式，IMU 可用时优先做高频传播，轮速计可用时提供地面平台运动先验，都缺失时退回恒速模型。",
+            "更新层：LiDAR 点云不再只做点到平面，而是和多层 GP sub-mesh 做 point-to-mesh 约束；相机可用时，光流跟踪的成熟特征再贡献重投影误差。",
+            "地图层：环境被拆成局部 sub-mesh，每个网格可拟合多层 Gaussian Process 表面，这让系统既能做稠密 mesh，也能给视觉特征做 ray-to-mesh 深度恢复。",
+            "后端层：ESC 描述子负责 LiDAR 拓扑回环，Bidirectional PnP 负责视觉回环，GNSS 和 odometry 约束一起进入混合位姿图，目标是同时修轨迹和修地图。",
         ]
     return [
-        "输入层：从点云、局部邻域或连续帧中构造几何信息，重点看局部结构是否足够稳定。",
-        "表示层：把几何关系编码为协方差、曲面、对应关系或可学习特征，目标是减少稀疏和噪声带来的不稳定。",
-        "优化层：这些几何信息会进入匹配、残差权重、回环或地图更新，最终影响轨迹和地图一致性。",
-        "验证层：最有说服力的是消融实验和退化场景对比，能说明新增模块不是只带来额外计算量。",
+        "几何表示：每个 LiDAR 点被看成 3D Gaussian，协方差描述局部表面形状；稀疏点云里，协方差比单个点坐标更能表达“这个点附近像不像一片稳定表面”。",
+        "自监督来源：模型不用真值位姿或 dense geometry 标签，而是用对应点残差和 SLAM 估计轨迹之间的一致性来训练局部协方差。",
+        "推理模块：对应 likelihood 检查点对残差能否被协方差解释；pose likelihood 检查由协方差诱导出的位姿是否贴近记忆中的 SLAM 位姿。",
+        "反馈闭环：训练出的 covariance estimator 会把高各向异性的点用于采样增密，增密点云再送进 SLAM 后端更新轨迹和对应关系。",
+        "工程价值：它不是替换整个 SLAM，而是作为几何增强模块插到现有 LiDAR SLAM 前端，让低线数或稀疏输入更接近高质量几何约束。",
     ]
 
 
@@ -823,20 +831,26 @@ def _experiment_points(paper: dict[str, Any], reading: PaperReading) -> list[str
     terms = set(paper.get("matched_terms", []))
     if {"spoofing", "jamming", "interference"} & terms:
         return [
-            "先看实验场景是否可控：干扰信号如何生成、持续多久、功率如何变化、是否有无干扰基线。",
-            "再看指标是否和任务一致：检测任务要看漏检、误检、检测延迟，而不只是画出曲线变化。",
-            "图里的 AGC/CNO 曲线要和干扰区间对齐看；如果弱干扰下某个指标不响应，就说明它不能单独作为完整性判据。",
+            "实验数据来自铁路场景 IQ 回放，接收端连续记录 30 分钟；每个 chirp 干扰区间持续 30 秒，并且后续区间功率逐步增加 5 dB。",
+            "AGC 曲线要看“跌落是否覆盖所有干扰段”：论文结果里 AGC-based detector 覆盖 7/7 个干扰区间，说明它对输入功率变化非常敏感。",
+            "C/N0 曲线要看“弱干扰是否漏掉”：CNO-based detector 检出 5/7 个区间，低功率的前两个区间没有稳定触发。",
+            "指标要同时看检出率和误报：表格给出 AGC 检测概率 100%、误报 0%；C/N0 检测概率约 76.5%、误报约 23%。",
+            "结论不能简单写成 AGC 完胜，因为 AGC 会受温度和前端状态影响，C/N0 会受卫星几何、多路径、跟踪恢复过程影响；组合判断才更接近工程完整性监测。",
         ]
     if {"fusion", "multi-sensor", "multimodal"} & terms:
         return [
-            "先看数据集覆盖面：室内/室外、城市峡谷、隧道、跨会话、GNSS denied 是否真的出现。",
-            "再看消融实验：去掉 GNSS、视觉、LiDAR、IMU 后，系统是否还能稳定工作。",
-            "最后看计算代价：多模态融合容易堆模块，公众号读者最该关心实时性、资源占用和失败案例。",
+            "第一层证据是组合覆盖：LXD-SLAM 不是只展示 LiDAR+IMU 的最强配置，而是要证明 LiDAR+X 的多种配置能共用同一估计框架。",
+            "第二层证据是对标专用系统：如果某个固定组合已经有成熟 SOTA，LXD-SLAM 至少要在精度上接近它，否则“统一框架”会牺牲性能。",
+            "第三层证据是地图质量：论文强调 dense mesh，就不能只看 ATE/RPE，还要看 mesh 是否连续、是否重影、回环后局部结构有没有撕裂。",
+            "第四层证据是实时性：GP sub-mesh、视觉 ray tracing、ESC、混合位姿图都很重，读实验时要留意帧率、内存和大场景增长趋势。",
+            "第五层证据是退化场景：长隧道、开阔地、窄视场 LiDAR、GNSS 受限和视觉贫纹理，才真正考验可配置融合是否有意义。",
         ]
     return [
-        "先看轨迹指标：绝对轨迹误差、相对位姿误差、回环前后漂移是否明显改善。",
-        "再看地图质量：局部结构是否更锐利，重建是否有重影、撕裂或尺度漂移。",
-        "最后看消融和泛化：只在一个数据集有效的几何模块，工程迁移价值会打折。",
+        "数据设置很克制：作者用 KITTI odometry Sequence 00，把原始 64 线点云降采样成 32 线和 16 线，专门观察稀疏输入下几何推理是否有价值。",
+        "后端不是作者重写的庞大系统，而是轻量 VGICP；这能说明模块更像一个可插拔几何增强层，而不是依赖特定后端的整套工程。",
+        "里程计指标用 300 帧区间 translational RPE。结果显示 16 线和 32 线在 2-step 后误差分别下降约 49.5% 和 47.8%，64 线只下降约 6.0%，说明收益主要来自稀疏场景。",
+        "全局配准用 TEASER，随机采 100 对距离 10m 内的扫描对，成功条件是旋转误差小于 10 度、平移误差小于 2m。",
+        "配准结果也符合直觉：32 线在 1-step 时成功率提升约 6.7%，64 线本来几何就足够好，后续提升更有限。",
     ]
 
 
@@ -859,7 +873,7 @@ def _contribution_and_limits(paper: dict[str, Any], reading: PaperReading) -> li
     return [
         "贡献：围绕局部几何或地图表达改进 SLAM 的关键薄弱环节，有助于减少前端错误向后端传播。",
         "贡献：如果实验包含消融和退化场景，说明方法不只是调参，而是在机制上提高了鲁棒性。",
-        "局限：局部几何方法通常依赖点云密度、传感器噪声和场景结构，跨平台迁移需要重新验证。",
+        "局限：局部几何方法高度依赖点云密度、传感器噪声和场景结构，跨平台迁移需要重新验证。",
         "局限：如果训练或参数选择依赖特定数据集，部署到新城市、新建筑或低成本雷达时可能退化。",
     ]
 
@@ -913,20 +927,20 @@ def _figure_reading(paper: dict[str, Any], reading: PaperReading, figure: DeepDi
     caption = figure.caption.lower()
     terms = set(paper.get("matched_terms", []))
     if "setup" in caption or "framework" in caption or "architecture" in caption or "system" in caption or "overview" in caption or "pipeline" in caption:
-        return "这张图适合当作论文的“主地图”来读：左侧通常是传感器或数据输入，中间是同步、融合、检测、建图或优化模块，右侧是定位、地图或告警输出。读它时不要急着看细节，先沿着箭头走一遍数据流，就能知道作者到底把创新点放在前端观测、后端优化，还是系统组织方式上。"
+        return "这张图适合当作论文的“主地图”来读：左侧是传感器或数据输入，中间是同步、融合、检测、建图或优化模块，右侧是定位、地图或告警输出。读它时不要急着看细节，先沿着箭头走一遍数据流，就能知道作者到底把创新点放在前端观测、后端优化，还是系统组织方式上。"
     if "chirp" in caption or "time-frequency" in caption or "time frequency" in caption:
         return "这张图不是最终检测结果，而是在说明干扰信号本身长什么样：频率会随时间扫过接收机关注的频段。读它时要把它当成后面 AGC/C/N0 异常的“起因”，先理解攻击输入，再看接收机内部观测量如何响应。"
     if {"spoofing", "jamming", "interference"} & terms:
         if index == 1:
             return "把这张图当成“观测量响应图”来读：干扰发生时，接收机前端的 AGC、C/N0 或检测量会出现同步变化。阅读重点不是曲线本身，而是变化是否清晰、是否和干扰区间对齐、弱干扰时是否仍能被看见。"
-        return "第二张图通常更接近“检测结果图”或“对比图”：重点比较不同检测器在同一时间轴上的响应差异，尤其是低功率干扰是否漏检、强干扰是否稳定触发。"
+        return "第二张图更接近“检测结果图”或“对比图”：重点比较不同检测器在同一时间轴上的响应差异，尤其是低功率干扰是否漏检、强干扰是否稳定触发。"
     if {"fusion", "multi-sensor", "multimodal"} & terms:
         if index == 1:
-            return "这类图通常展示大场景重建、轨迹或系统输出。读图时先看地图是否连续、轨迹是否闭合，再看它是否体现多传感器融合带来的稳定性，而不是只看视觉效果是否漂亮。"
+            return "这类图展示大场景重建、轨迹或系统输出。读图时先看地图是否连续、轨迹是否闭合，再看它是否体现多传感器融合带来的稳定性，而不是只看视觉效果是否漂亮。"
         return "第二张图适合看对比和细节：不同传感器组合、不同场景或不同退化条件下，系统是否还能保持地图一致和定位稳定。"
     if {"slam", "odometry", "mapping"} & terms:
         if index == 1:
-            return "这类图往往是在解释几何建模或约束构造。读图时先分清输入点、局部几何、对应关系和位姿变换分别是什么，再看这些量如何进入 SLAM 前端或后端。"
+            return "这张图是在解释几何建模或约束构造。读图时先分清输入点、局部几何、对应关系和位姿变换分别是什么，再看这些量如何进入 SLAM 前端或后端。"
         return "这张图更适合看结果验证：轨迹是否贴近真值、迭代是否收敛、地图或局部结构是否因为新模块变得更稳定。"
     if "agc" in caption or "cno" in caption or "detection" in caption:
         return "读这张图时不要只看曲线是否变化，而要把变化和干扰发生区间对齐：AGC 的突降、C/N0 的下降或检测脉冲，分别代表接收机前端增益控制、卫星信号质量和检测器输出。真正有价值的是弱干扰下谁先响应、谁漏检。"
@@ -948,8 +962,31 @@ def _commentary_author() -> str:
     return os.getenv("WECHAT_AUTHOR", "波波机器人")
 
 
+def _article_title(paper: dict[str, Any]) -> str:
+    return "论文解读｜" + _display_title(paper)
+
+
+def _display_title(paper: dict[str, Any]) -> str:
+    return _normalize_title(str(paper.get("title") or "Untitled paper"))
+
+
+def _normalize_title(value: str) -> str:
+    title = _clean_text(value)
+    title = re.sub(
+        r"\$?\s*\\sum_\{?i=0\}?\^\{?5\}?\s*C_5\^i\s*\$?",
+        "32",
+        title,
+    )
+    title = re.sub(r"\$([^$]+)\$", r"\1", title)
+    title = title.replace("\\", "")
+    title = re.sub(r"\s+", " ", title).strip()
+    if "LXD-SLAM" in title and "32" in title and "Configurable Sensor Combinations" in title:
+        return "LXD-SLAM：LiDAR+X 稠密 SLAM，32 种传感器组合"
+    return title
+
+
 def _wechat_title(paper: dict[str, Any]) -> str:
-    title = "论文解读｜" + paper["title"]
+    title = _article_title(paper)
     return title[:64]
 
 
