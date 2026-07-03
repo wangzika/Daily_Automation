@@ -201,6 +201,7 @@ def build_deepdive_markdown(
     image_map: dict[str, str],
 ) -> str:
     title = f"论文解读｜{paper['title']}"
+    chapters = _chapter_walkthrough(paper, reading)
     lines = [
         f"# {title}",
         "",
@@ -213,7 +214,7 @@ def build_deepdive_markdown(
         "",
         _one_sentence(paper, reading),
         "",
-        "## 原文线索",
+        "## 读前抓手",
         "",
         *_markdown_bullets(_source_clues(paper, reading)),
         "",
@@ -221,23 +222,10 @@ def build_deepdive_markdown(
         "",
         _story_intro(paper, reading),
         "",
-        "## 按章节讲论文",
+        "## 章节精读",
         "",
-        *_chapter_markdown(_chapter_walkthrough(paper, reading)),
-        "",
-        "## 1. 背景与痛点",
-        "",
-        *_markdown_bullets(_problem_context(paper, reading)),
-        "",
-        "## 2. 研究问题",
-        "",
-        *_markdown_bullets(_research_questions(paper, reading)),
-        "",
-        "## 3. 方法拆解",
-        "",
-        *_markdown_bullets(_method_points(paper, reading)),
-        "",
-        "## 4. 论文图解",
+        *_chapter_markdown(chapters[:2]),
+        "### 3. 主图和关键图解：先沿着数据流走一遍",
         "",
     ]
     for i, figure in enumerate(figures, start=1):
@@ -255,17 +243,7 @@ def build_deepdive_markdown(
 
     lines.extend(
         [
-            "## 5. 实验和指标怎么看",
-            "",
-            *_markdown_bullets(_experiment_points(paper, reading)),
-            "",
-            "## 6. 贡献与局限",
-            "",
-            *_markdown_bullets(_contribution_and_limits(paper, reading)),
-            "",
-            "## 7. 工程启发与复现清单",
-            "",
-            *_markdown_bullets(_engineering_points(paper, reading)),
+            *_chapter_markdown(chapters[2:], start=4),
             "",
             "## 读完之后可以追问",
             "",
@@ -284,6 +262,7 @@ def build_deepdive_html(
     image_map: dict[str, str],
 ) -> str:
     title = f"论文解读｜{paper['title']}"
+    chapters = _chapter_walkthrough(paper, reading)
     parts = [
         '<section style="max-width:677px;margin:0 auto;color:#24343a;font-family:-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif;">',
         f'<h1 style="margin:0 0 14px;color:#10272f;font-size:24px;line-height:1.38;font-weight:800;">{html.escape(title)}</h1>',
@@ -295,19 +274,13 @@ def build_deepdive_html(
         "</section>",
         _section_title("一句话读懂"),
         _paragraph(_one_sentence(paper, reading)),
-        _section_title("原文线索"),
+        _section_title("读前抓手"),
         _numbered_cards(_source_clues(paper, reading)),
         _section_title("故事版导读"),
         _paragraph(_story_intro(paper, reading)),
-        _section_title("按章节讲论文"),
-        _chapter_cards(_chapter_walkthrough(paper, reading)),
-        _section_title("1. 背景与痛点"),
-        _numbered_cards(_problem_context(paper, reading)),
-        _section_title("2. 研究问题"),
-        _numbered_cards(_research_questions(paper, reading)),
-        _section_title("3. 方法拆解"),
-        _numbered_cards(_method_points(paper, reading)),
-        _section_title("4. 论文图解"),
+        _section_title("章节精读"),
+        _chapter_cards(chapters[:2]),
+        _inline_chapter_title(3, "主图和关键图解：先沿着数据流走一遍"),
     ]
 
     for i, figure in enumerate(figures, start=1):
@@ -325,12 +298,7 @@ def build_deepdive_html(
 
     parts.extend(
         [
-            _section_title("5. 实验和指标怎么看"),
-            _numbered_cards(_experiment_points(paper, reading)),
-            _section_title("6. 贡献与局限"),
-            _numbered_cards(_contribution_and_limits(paper, reading)),
-            _section_title("7. 工程启发与复现清单"),
-            _numbered_cards(_engineering_points(paper, reading)),
+            _chapter_cards(chapters[2:], start=4),
             _section_title("读完之后可以追问"),
             _numbered_cards(_followup_questions(paper)),
             '<p style="margin:22px 0 0;color:#8a9da3;font-size:12px;line-height:1.8;">图像来自论文 PDF，仅用于论文解读和学术讨论，正式转载前建议核对论文许可和作者要求。</p>',
@@ -548,6 +516,9 @@ def _cover_score(figure: DeepDiveFigure) -> float:
         "system",
         "workflow",
         "flow",
+        "setup",
+        "experimental setup",
+        "infrastructure",
         "method",
         "network",
         "diagram",
@@ -610,9 +581,13 @@ def _story_intro(paper: dict[str, Any], reading: PaperReading) -> str:
     )
 
 
-def _chapter_walkthrough(paper: dict[str, Any], reading: PaperReading) -> list[tuple[str, str]]:
+def _chapter_walkthrough(paper: dict[str, Any], reading: PaperReading) -> list[tuple[str, str, tuple[str, ...]]]:
     terms = set(paper.get("matched_terms", []))
     if {"spoofing", "jamming", "interference"} & terms:
+        fallback_intro = (
+            "引言部分通常先说明 GNSS 为什么会从“可靠全局位置”变成风险源：信号弱、环境复杂、攻击门槛下降，"
+            "都会让最终 PVT 结果来不及承担第一道告警。"
+        )
         fallback_method = (
             "方法章通常先搭建可控的 GNSS 干扰/欺骗场景，再把接收机输出的 AGC、C/N0 或检测器响应拉到同一时间轴上。"
             "通俗地说，它不是直接问“位置有没有错”，而是先问“接收机是不是已经开始用力自救”。"
@@ -621,7 +596,12 @@ def _chapter_walkthrough(paper: dict[str, Any], reading: PaperReading) -> list[t
             "实验章的重点是把干扰区间和观测曲线对齐：弱干扰时谁先响应，强干扰时谁稳定触发，正常波动时谁更不容易误报。"
             "这决定了它能不能进入真实完整性监测链路。"
         )
+        fallback_conclusion = "结论部分要看检测边界：接收机状态量能提前暴露异常，但它还需要和融合定位、完整性监测一起工作。"
     elif {"fusion", "multi-sensor", "multimodal"} & terms:
+        fallback_intro = (
+            "引言部分通常在解释真实平台为什么不能只依赖单一传感器：GNSS 会失锁，视觉会退化，LiDAR 会遇到几何不足，"
+            "IMU 又会随时间漂移。"
+        )
         fallback_method = (
             "方法章通常在讲传感器如何分工：IMU 给短时运动先验，LiDAR/视觉给几何约束，GNSS 给全局约束。"
             "真正的看点是这些约束如何进入滤波器、因子图或后端优化，以及系统如何给不可靠观测降权。"
@@ -630,7 +610,11 @@ def _chapter_walkthrough(paper: dict[str, Any], reading: PaperReading) -> list[t
             "实验章要重点看传感器缺失、GNSS denied、几何退化和跨场景测试。只在所有传感器都正常时表现好，"
             "还不能说明系统能上真实平台。"
         )
+        fallback_conclusion = "结论部分要看系统边界：多传感器组合越灵活，同步、标定、计算资源和长期维护压力也越大。"
     else:
+        fallback_intro = (
+            "引言部分通常从 SLAM 的老问题切入：局部匹配一旦不稳，误差就会一路传到后端优化，最后表现为轨迹漂移和地图重影。"
+        )
         fallback_method = (
             "方法章通常解释作者怎样重新组织局部几何、匹配关系或地图表达。通俗地说，"
             "它是在告诉 SLAM 系统哪些点更可信、哪些约束更该相信，以及怎样避免错误匹配拖垮整条轨迹。"
@@ -639,55 +623,63 @@ def _chapter_walkthrough(paper: dict[str, Any], reading: PaperReading) -> list[t
             "实验章需要把轨迹误差、地图质量、消融实验和失败案例一起看。平均误差下降当然重要，"
             "但更关键的是退化场景里是否更稳。"
         )
+        fallback_conclusion = "结论部分要看可迁移性：新增几何模块是否能离开原数据集、原传感器配置，仍然稳定改善定位和建图。"
 
     return [
         (
-            "摘要：先把故事讲成一句话",
-            _section_narrative(
-                reading.abstract,
-                "摘要通常先交代问题、方法和结论。读这篇时，可以先抓三个词：它面对什么定位风险，用什么观测或模型解决，最后用什么实验说明有效。",
-            ),
-        ),
-        (
-            "引言：为什么这个问题非做不可",
+            "背景和问题：论文为什么值得读",
             _section_narrative(
                 reading.introduction,
-                "引言部分是在搭舞台：真实系统里 GNSS 会被遮挡、欺骗或干扰，传感器会退化，SLAM 会漂移。作者要说服读者，这不是一个漂亮数据集上的小修小补，而是部署时迟早会撞上的问题。",
+                fallback_intro,
             ),
+            tuple([*_problem_context(paper, reading)[:2], *_research_questions(paper, reading)[:2]]),
         ),
         (
-            "方法：作者真正搭了哪台机器",
+            "方法拆解：作者真正搭了哪台机器",
             _section_narrative(reading.method, fallback_method),
+            tuple(_method_points(paper, reading)),
         ),
         (
-            "实验：证据链是否站得住",
+            "实验验证：证据链是否站得住",
             _section_narrative(reading.experiments, fallback_exp),
+            tuple(_experiment_points(paper, reading)),
         ),
         (
-            "结论：论文留下了什么边界",
+            "贡献边界和复现：哪些能迁移，哪些要小心",
             _section_narrative(
                 reading.conclusion,
-                "结论部分要反过来看：作者承认了哪些边界，哪些场景还没覆盖，哪些模块以后还要加强。工程读者最该带走的不是一个分数，而是它能迁移到自己系统里的哪一层。",
+                fallback_conclusion,
             ),
+            tuple([*_contribution_and_limits(paper, reading), *_engineering_points(paper, reading)[:2]]),
         ),
     ]
 
 
-def _chapter_markdown(chapters: list[tuple[str, str]]) -> list[str]:
+def _chapter_markdown(chapters: list[tuple[str, str, tuple[str, ...]]], start: int = 1) -> list[str]:
     lines: list[str] = []
-    for index, (title, body) in enumerate(chapters, start=1):
+    for index, (title, body, points) in enumerate(chapters, start=start):
         lines.extend([f"### {index}. {title}", "", body, ""])
+        if points:
+            lines.extend([*_markdown_bullets(list(points)), ""])
     return lines
 
 
-def _chapter_cards(chapters: list[tuple[str, str]]) -> str:
+def _chapter_cards(chapters: list[tuple[str, str, tuple[str, ...]]], start: int = 1) -> str:
     cards = []
-    for index, (title, body) in enumerate(chapters, start=1):
+    for index, (title, body, points) in enumerate(chapters, start=start):
+        point_html = ""
+        if points:
+            point_html = "".join(
+                f'<p style="margin:8px 0 0;color:#40545c;font-size:14px;line-height:1.8;">'
+                f'<strong style="color:#0b9984;">{point_index}.</strong> {html.escape(point)}</p>'
+                for point_index, point in enumerate(points, start=1)
+            )
         cards.append(
             '<section style="margin:0 0 12px;padding:14px 15px;background:#f7fbfb;'
             'border:1px solid #e0eeee;border-radius:8px;">'
             f'<p style="margin:0 0 8px;color:#0b9984;font-size:14px;font-weight:800;">{index}. {html.escape(title)}</p>'
             f'<p style="margin:0;color:#40545c;font-size:14px;line-height:1.9;">{html.escape(body)}</p>'
+            f"{point_html}"
             "</section>"
         )
     return "".join(cards)
@@ -722,11 +714,9 @@ def _section_narrative(section_text: str, fallback: str) -> str:
         ),
     )
     keyword_text = f"文中这一段反复出现的线索是 {', '.join(keywords[:6])}。" if keywords else ""
-    return (
-        f"{fallback}"
-        f"{keyword_text}"
-        "把它翻成工程语言，就是先确认输入观测是否可信，再看这些观测如何变成约束、告警或地图更新，最后看实验有没有覆盖真实失败模式。"
-    )
+    if keyword_text:
+        return f"{fallback}{keyword_text}"
+    return fallback
 
 
 def _section_hint(section_text: str, label: str) -> str:
@@ -924,6 +914,8 @@ def _figure_reading(paper: dict[str, Any], reading: PaperReading, figure: DeepDi
     terms = set(paper.get("matched_terms", []))
     if "setup" in caption or "framework" in caption or "architecture" in caption or "system" in caption or "overview" in caption or "pipeline" in caption:
         return "这张图适合当作论文的“主地图”来读：左侧通常是传感器或数据输入，中间是同步、融合、检测、建图或优化模块，右侧是定位、地图或告警输出。读它时不要急着看细节，先沿着箭头走一遍数据流，就能知道作者到底把创新点放在前端观测、后端优化，还是系统组织方式上。"
+    if "chirp" in caption or "time-frequency" in caption or "time frequency" in caption:
+        return "这张图不是最终检测结果，而是在说明干扰信号本身长什么样：频率会随时间扫过接收机关注的频段。读它时要把它当成后面 AGC/C/N0 异常的“起因”，先理解攻击输入，再看接收机内部观测量如何响应。"
     if {"spoofing", "jamming", "interference"} & terms:
         if index == 1:
             return "把这张图当成“观测量响应图”来读：干扰发生时，接收机前端的 AGC、C/N0 或检测量会出现同步变化。阅读重点不是曲线本身，而是变化是否清晰、是否和干扰区间对齐、弱干扰时是否仍能被看见。"
@@ -981,6 +973,15 @@ def _section_title(text: str) -> str:
         '<section style="margin:28px 0 14px;">'
         '<p style="margin:0 0 7px;width:42px;height:4px;background:#25d8b8;border-radius:2px;"></p>'
         f'<h2 style="margin:0;color:#122b34;font-size:21px;line-height:1.45;font-weight:800;">{html.escape(text)}</h2>'
+        "</section>"
+    )
+
+
+def _inline_chapter_title(index: int, text: str) -> str:
+    return (
+        '<section style="margin:0 0 12px;padding:14px 15px;background:#f7fbfb;'
+        'border:1px solid #e0eeee;border-radius:8px;">'
+        f'<p style="margin:0;color:#0b9984;font-size:14px;font-weight:800;">{index}. {html.escape(text)}</p>'
         "</section>"
     )
 
