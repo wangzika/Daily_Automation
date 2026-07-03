@@ -107,7 +107,7 @@ AUTOMATION_DEEPDIVE_MODE=draft
 到每天 `20:45` 时，macOS 会自动执行：
 
 ```bash
-/Users/wangzhibo/Documents/Codex/2026-07-03/wo/scripts/daily_automation.sh
+<项目目录>/scripts/daily_automation.sh
 ```
 
 当前项目默认时间是每天晚上 `20:45`。
@@ -324,7 +324,27 @@ invalid ip xxx.xxx.xxx.xxx, not in whitelist
 
 解决方式是在公众号后台的“安全中心 / IP 白名单”里加入当前脚本运行机器的公网 IP。
 
-### 11.3 为什么没有直接正式发布？
+### 11.3 launchd 报 Operation not permitted 怎么办？
+
+如果日志里出现：
+
+```text
+Operation not permitted
+```
+
+常见原因是项目放在 `~/Documents`、`~/Desktop` 等受 macOS 隐私保护的目录里。推荐把项目放到不受 Documents 权限影响的位置，例如：
+
+```text
+/Users/wangzhibo/Projects/Daily_Automation
+```
+
+迁移后需要在新目录重新安装定时任务：
+
+```bash
+./scripts/install_daily_launchd.sh HH:MM
+```
+
+### 11.4 为什么没有直接正式发布？
 
 当前默认是 `draft` 模式，只创建草稿，不正式发布。这样更安全，可以先人工检查排版、封面和图片。
 
@@ -337,7 +357,7 @@ AUTOMATION_DEEPDIVE_MODE=publish
 
 但前提是公众号账号具备 `freepublish` 接口权限。
 
-### 11.4 怎么确认定时任务已经安装？
+### 11.5 怎么确认定时任务已经安装？
 
 重新运行安装脚本后，如果看到类似输出，说明已经安装：
 
@@ -352,7 +372,7 @@ Schedule: daily at 20:45
 launchctl kickstart -k gui/$(id -u)/com.codex.daily-gnss-slam-digest
 ```
 
-### 11.5 GitHub 没有提交怎么办？
+### 11.6 GitHub 没有提交怎么办？
 
 检查以下配置：
 
