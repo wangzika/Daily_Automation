@@ -22,7 +22,7 @@
     "influential_citation_count": null,
     "venue": null,
     "code_url": null,
-    "score": 56.05,
+    "score": 56.04,
     "topic_scores": {
       "GNSS 欺骗与干扰检测": 52.0
     },
@@ -69,7 +69,7 @@
     "influential_citation_count": null,
     "venue": null,
     "code_url": null,
-    "score": 112.2,
+    "score": 112.17,
     "topic_scores": {
       "多模态/多传感器融合": 43.0,
       "SLAM 与鲁棒里程计": 42.0
@@ -124,7 +124,7 @@
     "influential_citation_count": null,
     "venue": null,
     "code_url": null,
-    "score": 51.46,
+    "score": 51.43,
     "topic_scores": {
       "SLAM 与鲁棒里程计": 34.0
     },
@@ -167,7 +167,7 @@
     "influential_citation_count": null,
     "venue": null,
     "code_url": null,
-    "score": 68.92,
+    "score": 68.89,
     "topic_scores": {
       "多模态/多传感器融合": 14.0,
       "SLAM 与鲁棒里程计": 21.0
@@ -214,7 +214,7 @@
     "influential_citation_count": null,
     "venue": null,
     "code_url": null,
-    "score": 68.17,
+    "score": 68.14,
     "topic_scores": {
       "多模态/多传感器融合": 18.0,
       "SLAM 与鲁棒里程计": 21.0
