@@ -154,6 +154,8 @@ PYTHONPATH=src python scripts/upload_cover_to_wechat.py outputs/wechat-cover-gns
 
 总控脚本会按顺序执行：生成每日推荐、创建公众号草稿、生成单篇论文解读草稿、按周生成热点汇总、提交并推送到 GitHub、发送总结邮件。
 
+完整的自动化说明见 [docs/automation-guide.md](docs/automation-guide.md)。
+
 ```bash
 ./scripts/daily_automation.sh
 ```
