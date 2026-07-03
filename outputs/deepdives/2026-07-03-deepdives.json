@@ -4,6 +4,10 @@
     "outputs/deepdives/02-lxd-slam-lidar-x-dense-slam-with-sum-i-0-5-c-5-i-configurable-sensor-c/article.html",
     "outputs/deepdives/03-self-supervised-geometry-reasoning-for-lidar-simultaneous-localization/article.html"
   ],
-  "draft_media_ids": [],
+  "draft_media_ids": [
+    "OzDw82ZGuV7j2GWA35lmhsCr4l6JbjSk5ayuH02mACoqarbk-SOIwCmR9ArU70O0",
+    "OzDw82ZGuV7j2GWA35lmhoei-sYv6CSQg4o182uJ8apCXGJEfjZMaqmdQ4quZjel",
+    "OzDw82ZGuV7j2GWA35lmhjbZXLRUw3ZWl-7BL8L9NvoVEK_Fnb5ru1x0xbeWxtMs"
+  ],
   "publish_results": []
 }
