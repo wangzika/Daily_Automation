@@ -102,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"figure_{i}": publisher.upload_article_image(access_token, figure.path)
                 for i, figure in enumerate(figures, start=1)
             }
-            wechat_html = build_deepdive_html(paper, reading, figures, image_urls)
+            wechat_html = build_deepdive_html(paper, reading, figures, image_urls, include_title=False)
             title = _wechat_title(paper)
             media_id = publisher.add_draft(
                 access_token=access_token,
@@ -260,12 +260,18 @@ def build_deepdive_html(
     reading: PaperReading,
     figures: list[DeepDiveFigure],
     image_map: dict[str, str],
+    *,
+    include_title: bool = True,
 ) -> str:
     title = _article_title(paper)
     chapters = _chapter_walkthrough(paper, reading)
     parts = [
         '<section style="max-width:677px;margin:0 auto;color:#24343a;font-family:-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif;">',
-        f'<h1 style="margin:0 0 14px;color:#10272f;font-size:24px;line-height:1.38;font-weight:800;">{html.escape(title)}</h1>',
+    ]
+    if include_title:
+        parts.append(f'<h1 style="margin:0 0 14px;color:#10272f;font-size:22px;line-height:1.45;font-weight:800;">{html.escape(title)}</h1>')
+    parts.extend(
+        [
         '<section style="margin:0 0 18px;padding:15px 16px;background:#f5fbfa;border-left:4px solid #25d8b8;color:#33484f;font-size:14px;line-height:1.9;">',
         f"作者：{html.escape(_commentary_author())}<br/>",
         f"论文作者：{html.escape(_authors(paper))}<br/>",
@@ -281,7 +287,8 @@ def build_deepdive_html(
         _section_title("章节精读"),
         _chapter_cards(chapters[:2]),
         _inline_chapter_title(3, "主图和关键图解：先沿着数据流走一遍"),
-    ]
+        ]
+    )
 
     for i, figure in enumerate(figures, start=1):
         key = f"figure_{i}"
@@ -986,8 +993,18 @@ def _normalize_title(value: str) -> str:
 
 
 def _wechat_title(paper: dict[str, Any]) -> str:
-    title = _article_title(paper)
-    return title[:64]
+    display_title = _display_title(paper)
+    lowered = display_title.lower()
+    if "jamming" in lowered and "agc" in lowered:
+        return "论文解读｜GNSS干扰检测：AGC与C/N0"
+    if "lxd-slam" in lowered:
+        return "论文解读｜LXD-SLAM：32种传感器组合"
+    if "self-supervised" in lowered and "geometry" in lowered:
+        return "论文解读｜LiDAR SLAM自监督几何推理"
+    title = "论文解读｜" + display_title
+    if len(title) <= 34:
+        return title
+    return title[:31].rstrip(" -:：,，") + "..."
 
 
 def _digest(paper: dict[str, Any]) -> str:
