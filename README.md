@@ -166,6 +166,7 @@ PYTHONPATH=src python scripts/upload_cover_to_wechat.py outputs/wechat-cover-gns
 
 ```bash
 AUTOMATION_TIME=20:45
+AUTOMATION_PYTHON=
 AUTOMATION_WECHAT_MODE=draft
 AUTOMATION_DEEPDIVE_MODE=draft
 AUTOMATION_LOG_TAIL_LINES=60
@@ -178,7 +179,7 @@ GIT_AUTHOR_NAME="GNSS Paper Bot"
 GIT_AUTHOR_EMAIL=your@email.com
 ```
 
-`AUTOMATION_WECHAT_MODE` 和 `AUTOMATION_DEEPDIVE_MODE` 支持 `none`、`draft`、`publish`。总控脚本会自动设置 `EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES=1`，只保留最后一封总结邮件；如果想调试子步骤邮件，可以在 `.env` 里显式设为 `0`。如果当前目录还不是 git 仓库，脚本会在 `GITHUB_REPO_URL` 存在时自动 `git init`、添加 `origin` 并推送。`.env`、日志、论文 PDF 和中间缓存不会提交；最终文章、正文图和配置代码会提交。
+`AUTOMATION_WECHAT_MODE` 和 `AUTOMATION_DEEPDIVE_MODE` 支持 `none`、`draft`、`publish`。如果 launchd 使用的系统 Python 缺少依赖，可以把 `AUTOMATION_PYTHON` 设置为可用解释器，例如 `/Users/wangzhibo/miniconda3/bin/python`。总控脚本会自动设置 `EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES=1`，只保留最后一封总结邮件；如果想调试子步骤邮件，可以在 `.env` 里显式设为 `0`。如果当前目录还不是 git 仓库，脚本会在 `GITHUB_REPO_URL` 存在时自动 `git init`、添加 `origin` 并推送。`.env`、日志、论文 PDF 和中间缓存不会提交；最终文章、正文图和配置代码会提交。
 
 单独生成本周热点汇总：
 

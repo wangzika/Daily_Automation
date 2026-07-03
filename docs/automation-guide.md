@@ -120,6 +120,7 @@ AUTOMATION_DEEPDIVE_MODE=draft
 
 ```bash
 AUTOMATION_TIME=20:45
+AUTOMATION_PYTHON=/Users/wangzhibo/miniconda3/bin/python
 WEEKLY_SUMMARY_ENABLED=1
 WEEKLY_SUMMARY_DAY=5
 WEEKLY_SUMMARY_DAYS=7
@@ -128,6 +129,7 @@ WEEKLY_SUMMARY_DAYS=7
 含义是：
 
 - 每天晚上 `20:45` 运行一次总控脚本。
+- `AUTOMATION_PYTHON` 指定 launchd 使用的 Python，避免系统 Python 缺少 Pillow 等依赖。
 - 如果当天是 `WEEKLY_SUMMARY_DAY` 指定的星期，就额外生成周报。
 - `WEEKLY_SUMMARY_DAY=5` 表示周五。
 - `WEEKLY_SUMMARY_DAYS=7` 表示汇总最近 7 天的日报候选论文。

@@ -21,7 +21,11 @@ if [[ "$MODE" != "none" && "$MODE" != "draft" && "$MODE" != "publish" ]]; then
   exit 2
 fi
 
-if [[ -x .venv/bin/python ]]; then
+if [[ -n "${AUTOMATION_PYTHON:-}" ]]; then
+  PYTHON="$AUTOMATION_PYTHON"
+elif [[ -n "${PYTHON_BIN:-}" ]]; then
+  PYTHON="$PYTHON_BIN"
+elif [[ -x .venv/bin/python ]]; then
   PYTHON=.venv/bin/python
 else
   PYTHON=python3
