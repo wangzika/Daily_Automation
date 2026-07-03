@@ -1,0 +1,178 @@
+[
+  {
+    "title": "GNSS Jamming Detection with Automatic Gain Control (AGC) and Carrier-to-Noise Ratio Density (CNO) Observables from a COTS receiver",
+    "authors": [
+      "Syed Ali Kazim",
+      "Anas Darwich",
+      "Juliette Marais"
+    ],
+    "url": "http://arxiv.org/abs/2602.12688v1",
+    "pdf_url": "https://arxiv.org/pdf/2602.12688v1",
+    "published": "2026-02-13T07:43:35+00:00",
+    "updated": "2026-02-13T07:43:35+00:00",
+    "categories": [
+      "eess.SP"
+    ],
+    "primary_category": "eess.SP",
+    "score": 56.06,
+    "topic_scores": {
+      "GNSS 欺骗与干扰检测": 52.0
+    },
+    "matched_terms": [
+      "gnss",
+      "gps",
+      "spoofing",
+      "jamming",
+      "interference",
+      "integrity",
+      "detection",
+      "receiver"
+    ],
+    "reason": "主题贴合 GNSS 欺骗与干扰检测，关键词集中在 gnss、gps、spoofing、jamming、interference、integrity、detection、receiver，适合作为今日跟踪论文。"
+  },
+  {
+    "title": "LXD-SLAM: LiDAR+X Dense SLAM with $\\sum_{i=0}^{5}C_5^i$ Configurable Sensor Combinations",
+    "authors": [
+      "Zhong Wang",
+      "Lin Zhang",
+      "Linfei Li",
+      "Ying Shen",
+      "Shaoming Zhang",
+      "Pengcheng Shi",
+      "Shengjie Zhao"
+    ],
+    "url": "http://arxiv.org/abs/2606.27811v1",
+    "pdf_url": "https://arxiv.org/pdf/2606.27811v1",
+    "published": "2026-06-26T07:53:09+00:00",
+    "updated": "2026-06-26T07:53:09+00:00",
+    "categories": [
+      "cs.RO"
+    ],
+    "primary_category": "cs.RO",
+    "score": 104.33,
+    "topic_scores": {
+      "多模态/多传感器融合": 43.0,
+      "SLAM 与鲁棒里程计": 42.0
+    },
+    "matched_terms": [
+      "fusion",
+      "multi-sensor",
+      "lidar",
+      "visual",
+      "camera",
+      "imu",
+      "gnss",
+      "kalman",
+      "slam",
+      "odometry",
+      "localization",
+      "mapping",
+      "loop",
+      "degeneracy",
+      "robust",
+      "gaussian"
+    ],
+    "reason": "主题贴合 多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 fusion、multi-sensor、lidar、visual、camera、imu、gnss、kalman，适合作为今日跟踪论文。"
+  },
+  {
+    "title": "Self-supervised Geometry Reasoning for LiDAR Simultaneous Localization and Mapping",
+    "authors": [
+      "Jiwoo Kim",
+      "Jinwoo Lee",
+      "Woojae Shin",
+      "Giseop Kim",
+      "Hyondong Oh"
+    ],
+    "url": "http://arxiv.org/abs/2606.30166v1",
+    "pdf_url": "https://arxiv.org/pdf/2606.30166v1",
+    "published": "2026-06-29T11:43:20+00:00",
+    "updated": "2026-06-29T11:43:20+00:00",
+    "categories": [
+      "cs.RO"
+    ],
+    "primary_category": "cs.RO",
+    "score": 51.6,
+    "topic_scores": {
+      "SLAM 与鲁棒里程计": 34.0
+    },
+    "matched_terms": [
+      "slam",
+      "odometry",
+      "localization",
+      "mapping",
+      "loop",
+      "gaussian"
+    ],
+    "reason": "主题贴合 SLAM 与鲁棒里程计，关键词集中在 slam、odometry、localization、mapping、loop、gaussian，适合作为今日跟踪论文。"
+  },
+  {
+    "title": "Cross-Session 3D LiDAR and Camera Fusion for Robust Localization of Unmanned Aerial Vehicles in GPS-Denied Environments",
+    "authors": [
+      "Cong Hoang Quach",
+      "Chi Thanh Vo",
+      "Dong LT. Tran",
+      "Truong Son Nguyen",
+      "Manh Duong Phung",
+      "Thuan Hoang Tran"
+    ],
+    "url": "http://arxiv.org/abs/2606.28951v1",
+    "pdf_url": "https://arxiv.org/pdf/2606.28951v1",
+    "published": "2026-06-27T14:48:46+00:00",
+    "updated": "2026-06-27T14:48:46+00:00",
+    "categories": [
+      "cs.RO"
+    ],
+    "primary_category": "cs.RO",
+    "score": 62.64,
+    "topic_scores": {
+      "多模态/多传感器融合": 27.0,
+      "SLAM 与鲁棒里程计": 16.0
+    },
+    "matched_terms": [
+      "fusion",
+      "lidar",
+      "visual",
+      "camera",
+      "inertial",
+      "odometry",
+      "localization",
+      "robust"
+    ],
+    "reason": "主题贴合 多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 fusion、lidar、visual、camera、inertial、odometry、localization、robust，适合作为今日跟踪论文。"
+  },
+  {
+    "title": "PL-LIT: A LiDAR-Inertial-Thermal SLAM Using Point-Line Features and Thermographic Mapping",
+    "authors": [
+      "Jiawei Xia",
+      "Yixiao Feng",
+      "Yongliang Shi",
+      "Chao Gao",
+      "Renjing Xu",
+      "Weining Lu",
+      "Bin Liang"
+    ],
+    "url": "http://arxiv.org/abs/2606.29259v1",
+    "pdf_url": "https://arxiv.org/pdf/2606.29259v1",
+    "published": "2026-06-28T08:13:43+00:00",
+    "updated": "2026-06-28T08:13:43+00:00",
+    "categories": [
+      "cs.RO"
+    ],
+    "primary_category": "cs.RO",
+    "score": 60.82,
+    "topic_scores": {
+      "多模态/多传感器融合": 19.0,
+      "SLAM 与鲁棒里程计": 22.0
+    },
+    "matched_terms": [
+      "lidar",
+      "inertial",
+      "tightly coupled",
+      "kalman",
+      "slam",
+      "odometry",
+      "mapping"
+    ],
+    "reason": "主题贴合 多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 lidar、inertial、tightly coupled、kalman、slam、odometry、mapping，适合作为今日跟踪论文。"
+  }
+]

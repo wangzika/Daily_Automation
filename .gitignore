@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+build/
+dist/
+*.egg-info/
+work/
+outputs/logs/
+outputs/deepdives/**/paper.pdf
+outputs/deepdives/**/raw_images/
+outputs/deepdives/**/rendered_pages/
+outputs/deepdives/**/.cache/

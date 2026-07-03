@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "daily-gnss-slam-digest"
+version = "0.1.0"
+description = "Generate and optionally publish daily GNSS spoofing, multimodal fusion, and SLAM paper digests for WeChat Official Accounts."
+requires-python = ">=3.10"
+dependencies = ["Pillow>=10"]
+
+[project.scripts]
+daily-gnss-slam-digest = "daily_gnss_slam_digest.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
