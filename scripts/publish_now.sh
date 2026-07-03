@@ -12,8 +12,8 @@ if [[ -f .env ]]; then
 fi
 
 MODE="${1:-${WECHAT_PUBLISH_MODE:-draft}}"
-if [[ "$MODE" != "draft" && "$MODE" != "publish" ]]; then
-  echo "Usage: $0 [draft|publish]" >&2
+if [[ "$MODE" != "none" && "$MODE" != "draft" && "$MODE" != "publish" ]]; then
+  echo "Usage: $0 [none|draft|publish]" >&2
   exit 2
 fi
 
