@@ -23,7 +23,15 @@
       4
     ],
     [
-      "lidar",
+      "loop",
+      4
+    ],
+    [
+      "gnss",
+      3
+    ],
+    [
+      "visual",
       3
     ],
     [
@@ -35,35 +43,11 @@
       3
     ],
     [
-      "mapping",
-      3
-    ],
-    [
-      "gnss",
-      2
-    ],
-    [
-      "fusion",
-      2
-    ],
-    [
-      "visual",
-      2
-    ],
-    [
       "camera",
       2
     ],
     [
-      "kalman",
-      2
-    ],
-    [
-      "loop",
-      2
-    ],
-    [
-      "robust",
+      "mapping",
       2
     ],
     [
@@ -81,6 +65,22 @@
     [
       "spoofing",
       1
+    ],
+    [
+      "jamming",
+      1
+    ],
+    [
+      "interference",
+      1
+    ],
+    [
+      "integrity",
+      1
+    ],
+    [
+      "detection",
+      1
     ]
   ],
   "hot_directions": [
@@ -89,23 +89,88 @@
       4
     ],
     [
+      "GNSS 完整性与欺骗/干扰检测",
+      3
+    ],
+    [
       "多模态融合与传感器退化处理",
       3
     ],
     [
-      "GNSS 完整性与欺骗/干扰检测",
-      2
+      "可复现代码与开源实现",
+      3
+    ],
+    [
+      "数据集与 benchmark",
+      1
     ]
   ],
   "top_papers": [
     {
+      "title": "AUSLUN: A Fixed-Hover UAV--USV System for GNSS-Denied Maritime Search and Navigation",
+      "url": "http://arxiv.org/abs/2606.29875v1",
+      "published": "2026-06-29",
+      "score": 68.92,
+      "quality_score": 14.0,
+      "quality_signals": {
+        "venue": "NAVIGATION",
+        "venue_bonus": 6.0,
+        "code_url": "https://github.com/xirhxq/pod_search",
+        "real_world_signal": true
+      },
+      "quality_summary": "质量分 14.0；venue NAVIGATION；代码开源；真实实验",
+      "topics": [
+        "多模态/多传感器融合",
+        "SLAM 与鲁棒里程计"
+      ],
+      "matched_terms": [
+        "visual",
+        "inertial",
+        "gnss",
+        "odometry",
+        "localization",
+        "loop",
+        "vio"
+      ],
+      "source_date": "2026-07-03"
+    },
+    {
+      "title": "DL-VINS-Factory: A Modular Framework for Learned Visual Front-Ends in Visual-Inertial SLAM",
+      "url": "http://arxiv.org/abs/2607.01757v1",
+      "published": "2026-07-02",
+      "score": 68.17,
+      "quality_score": 8.5,
+      "quality_signals": {
+        "code_url": "https://github.com/limshoonkit/DL-VINS-Factory-ROS2",
+        "dataset_signal": true
+      },
+      "quality_summary": "质量分 8.5；代码开源；数据集/benchmark",
+      "topics": [
+        "多模态/多传感器融合",
+        "SLAM 与鲁棒里程计"
+      ],
+      "matched_terms": [
+        "visual",
+        "camera",
+        "inertial",
+        "tightly coupled",
+        "slam",
+        "odometry",
+        "loop"
+      ],
+      "source_date": "2026-07-03"
+    },
+    {
       "title": "LXD-SLAM: LiDAR+X Dense SLAM with $\\sum_{i=0}^{5}C_5^i$ Configurable Sensor Combinations",
       "url": "http://arxiv.org/abs/2606.27811v1",
       "published": "2026-06-26",
-      "score": 104.33,
-      "quality_score": 0.0,
-      "quality_signals": {},
-      "quality_summary": "质量分 0.0；暂无外部质量元数据",
+      "score": 112.2,
+      "quality_score": 8.0,
+      "quality_signals": {
+        "code_url": "https://github.com/peterWon/LXD-SLAM",
+        "real_world_signal": true
+      },
+      "quality_summary": "质量分 8.0；代码开源；真实实验",
       "topics": [
         "多模态/多传感器融合",
         "SLAM 与鲁棒里程计"
@@ -131,60 +196,15 @@
       "source_date": "2026-07-03"
     },
     {
-      "title": "Cross-Session 3D LiDAR and Camera Fusion for Robust Localization of Unmanned Aerial Vehicles in GPS-Denied Environments",
-      "url": "http://arxiv.org/abs/2606.28951v1",
-      "published": "2026-06-27",
-      "score": 62.64,
-      "quality_score": 0.0,
-      "quality_signals": {},
-      "quality_summary": "质量分 0.0；暂无外部质量元数据",
-      "topics": [
-        "多模态/多传感器融合",
-        "SLAM 与鲁棒里程计"
-      ],
-      "matched_terms": [
-        "fusion",
-        "lidar",
-        "visual",
-        "camera",
-        "inertial",
-        "odometry",
-        "localization",
-        "robust"
-      ],
-      "source_date": "2026-07-03"
-    },
-    {
-      "title": "PL-LIT: A LiDAR-Inertial-Thermal SLAM Using Point-Line Features and Thermographic Mapping",
-      "url": "http://arxiv.org/abs/2606.29259v1",
-      "published": "2026-06-28",
-      "score": 60.82,
-      "quality_score": 0.0,
-      "quality_signals": {},
-      "quality_summary": "质量分 0.0；暂无外部质量元数据",
-      "topics": [
-        "多模态/多传感器融合",
-        "SLAM 与鲁棒里程计"
-      ],
-      "matched_terms": [
-        "lidar",
-        "inertial",
-        "tightly coupled",
-        "kalman",
-        "slam",
-        "odometry",
-        "mapping"
-      ],
-      "source_date": "2026-07-03"
-    },
-    {
       "title": "GNSS Jamming Detection with Automatic Gain Control (AGC) and Carrier-to-Noise Ratio Density (CNO) Observables from a COTS receiver",
       "url": "http://arxiv.org/abs/2602.12688v1",
       "published": "2026-02-13",
-      "score": 56.06,
+      "score": 56.05,
       "quality_score": 0.0,
-      "quality_signals": {},
-      "quality_summary": "质量分 0.0；暂无外部质量元数据",
+      "quality_signals": {
+        "venue": "7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany"
+      },
+      "quality_summary": "质量分 0.0；venue 7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany",
       "topics": [
         "GNSS 欺骗与干扰检测"
       ],
@@ -204,7 +224,7 @@
       "title": "Self-supervised Geometry Reasoning for LiDAR Simultaneous Localization and Mapping",
       "url": "http://arxiv.org/abs/2606.30166v1",
       "published": "2026-06-29",
-      "score": 51.6,
+      "score": 51.46,
       "quality_score": 0.0,
       "quality_signals": {},
       "quality_summary": "质量分 0.0；暂无外部质量元数据",
@@ -222,6 +242,150 @@
       "source_date": "2026-07-03"
     }
   ],
-  "code_papers": [],
-  "venue_papers": []
+  "code_papers": [
+    {
+      "title": "AUSLUN: A Fixed-Hover UAV--USV System for GNSS-Denied Maritime Search and Navigation",
+      "url": "http://arxiv.org/abs/2606.29875v1",
+      "published": "2026-06-29",
+      "score": 68.92,
+      "quality_score": 14.0,
+      "quality_signals": {
+        "venue": "NAVIGATION",
+        "venue_bonus": 6.0,
+        "code_url": "https://github.com/xirhxq/pod_search",
+        "real_world_signal": true
+      },
+      "quality_summary": "质量分 14.0；venue NAVIGATION；代码开源；真实实验",
+      "topics": [
+        "多模态/多传感器融合",
+        "SLAM 与鲁棒里程计"
+      ],
+      "matched_terms": [
+        "visual",
+        "inertial",
+        "gnss",
+        "odometry",
+        "localization",
+        "loop",
+        "vio"
+      ],
+      "source_date": "2026-07-03"
+    },
+    {
+      "title": "DL-VINS-Factory: A Modular Framework for Learned Visual Front-Ends in Visual-Inertial SLAM",
+      "url": "http://arxiv.org/abs/2607.01757v1",
+      "published": "2026-07-02",
+      "score": 68.17,
+      "quality_score": 8.5,
+      "quality_signals": {
+        "code_url": "https://github.com/limshoonkit/DL-VINS-Factory-ROS2",
+        "dataset_signal": true
+      },
+      "quality_summary": "质量分 8.5；代码开源；数据集/benchmark",
+      "topics": [
+        "多模态/多传感器融合",
+        "SLAM 与鲁棒里程计"
+      ],
+      "matched_terms": [
+        "visual",
+        "camera",
+        "inertial",
+        "tightly coupled",
+        "slam",
+        "odometry",
+        "loop"
+      ],
+      "source_date": "2026-07-03"
+    },
+    {
+      "title": "LXD-SLAM: LiDAR+X Dense SLAM with $\\sum_{i=0}^{5}C_5^i$ Configurable Sensor Combinations",
+      "url": "http://arxiv.org/abs/2606.27811v1",
+      "published": "2026-06-26",
+      "score": 112.2,
+      "quality_score": 8.0,
+      "quality_signals": {
+        "code_url": "https://github.com/peterWon/LXD-SLAM",
+        "real_world_signal": true
+      },
+      "quality_summary": "质量分 8.0；代码开源；真实实验",
+      "topics": [
+        "多模态/多传感器融合",
+        "SLAM 与鲁棒里程计"
+      ],
+      "matched_terms": [
+        "fusion",
+        "multi-sensor",
+        "lidar",
+        "visual",
+        "camera",
+        "imu",
+        "gnss",
+        "kalman",
+        "slam",
+        "odometry",
+        "localization",
+        "mapping",
+        "loop",
+        "degeneracy",
+        "robust",
+        "gaussian"
+      ],
+      "source_date": "2026-07-03"
+    }
+  ],
+  "venue_papers": [
+    {
+      "title": "AUSLUN: A Fixed-Hover UAV--USV System for GNSS-Denied Maritime Search and Navigation",
+      "url": "http://arxiv.org/abs/2606.29875v1",
+      "published": "2026-06-29",
+      "score": 68.92,
+      "quality_score": 14.0,
+      "quality_signals": {
+        "venue": "NAVIGATION",
+        "venue_bonus": 6.0,
+        "code_url": "https://github.com/xirhxq/pod_search",
+        "real_world_signal": true
+      },
+      "quality_summary": "质量分 14.0；venue NAVIGATION；代码开源；真实实验",
+      "topics": [
+        "多模态/多传感器融合",
+        "SLAM 与鲁棒里程计"
+      ],
+      "matched_terms": [
+        "visual",
+        "inertial",
+        "gnss",
+        "odometry",
+        "localization",
+        "loop",
+        "vio"
+      ],
+      "source_date": "2026-07-03"
+    },
+    {
+      "title": "GNSS Jamming Detection with Automatic Gain Control (AGC) and Carrier-to-Noise Ratio Density (CNO) Observables from a COTS receiver",
+      "url": "http://arxiv.org/abs/2602.12688v1",
+      "published": "2026-02-13",
+      "score": 56.05,
+      "quality_score": 0.0,
+      "quality_signals": {
+        "venue": "7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany"
+      },
+      "quality_summary": "质量分 0.0；venue 7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany",
+      "topics": [
+        "GNSS 欺骗与干扰检测"
+      ],
+      "matched_terms": [
+        "gnss",
+        "gps",
+        "spoofing",
+        "jamming",
+        "interference",
+        "integrity",
+        "detection",
+        "receiver"
+      ],
+      "source_date": "2026-07-03"
+    }
+  ]
 }

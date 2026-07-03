@@ -1,18 +1,18 @@
 {
   "articles": [
-    "outputs/deepdives/01-gnss-jamming-detection-with-automatic-gain-control-agc-and-carrier-to-/article.html",
-    "outputs/deepdives/02-lxd-slam-lidar-x-dense-slam-with-sum-i-0-5-c-5-i-configurable-sensor-c/article.html",
-    "outputs/deepdives/03-self-supervised-geometry-reasoning-for-lidar-simultaneous-localization/article.html"
+    "outputs/deepdives/01-2602.12688/article.html",
+    "outputs/deepdives/02-2606.27811/article.html",
+    "outputs/deepdives/03-2606.30166/article.html"
   ],
   "draft_media_ids": [
-    "OzDw82ZGuV7j2GWA35lmhpgcSedZVTLzxPYYyRBoNjaFxnCKZHi1paPU7NyedN36",
-    "OzDw82ZGuV7j2GWA35lmhvmI3ABpW4sJSf_U4WyoCFiBgQ1kgPMYR7QegJB-W6Kc",
-    "OzDw82ZGuV7j2GWA35lmhksGMgZ6ThVzsoLWLIyrS4Tu_FVke4UHbEyUxmXYU8K5"
+    "OzDw82ZGuV7j2GWA35lmhmTVfKwQcifAnKb8ihp_5kzodtcdS0XYYCEACv_P-YAm",
+    "OzDw82ZGuV7j2GWA35lmhoI8xxd-3sOSjP7SCgjdkuURYe8I6ht2eiw6wzZWZuRS",
+    "OzDw82ZGuV7j2GWA35lmhmaoZ2r0viRmuGFD2nce0z1mW5EbQMCZOK3A468dI_pz"
   ],
   "cover_media_ids": [
-    "OzDw82ZGuV7j2GWA35lmhnpZeh7WbyEuzNznnwaWK2BvdodcVCLRQNqjMmmrIj-h",
-    "OzDw82ZGuV7j2GWA35lmhk9z5cUe7lxOIv6tHuDEL-IHyuj1A18uIDmtexhtBV-U",
-    "OzDw82ZGuV7j2GWA35lmhlKfjKvV6qqTQCn1u93HuTRlTv1njWCp0yyuyHobU0GM"
+    "OzDw82ZGuV7j2GWA35lmhhYXHBQp8TKtlOlUfSQQkASAfFlfPEBCumMq3zMpod49",
+    "OzDw82ZGuV7j2GWA35lmhtixgBrjUpbWrn5E6wLru-OkWXqPC_YQO_jQ2HA5GN2b",
+    "OzDw82ZGuV7j2GWA35lmhkDat3U9Owj9v0uM0LGbVur5T6vrHEwsfHFRDqgvk0GR"
   ],
   "publish_results": []
 }

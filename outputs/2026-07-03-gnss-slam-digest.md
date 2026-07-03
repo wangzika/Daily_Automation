@@ -1,10 +1,10 @@
 # 每日 GNSS 欺骗检测 / 多模态融合 / SLAM 论文推荐 | 2026-07-03
 
-今天的推荐聚焦三个交叉点：GNSS 欺骗/干扰检测、多模态融合定位、SLAM 与鲁棒里程计。筛选逻辑优先考虑主题相关性、新近度，以及是否能给工程系统带来可验证的思路。
+今天的推荐聚焦三个交叉点：GNSS 欺骗/干扰检测、多模态融合定位、SLAM 与鲁棒里程计。筛选逻辑优先考虑主题相关性、新近度、引用/venue/开源代码等质量信号，以及是否能给工程系统带来可验证的思路。
 
 ## 筛选方法论
 
-这份日报不是简单按 arXiv 最新排序，而是先用主题查询收集候选论文，再按关键词命中、主题覆盖、发布时间和工程迁移价值进行排序。阅读时建议重点看：问题定义是否清晰、观测量是否可靠、融合位置是否合理、实验是否覆盖失败案例。
+这份日报不是简单按 arXiv 最新排序，而是先用主题查询收集候选论文，再做标题级去重，并按关键词命中、主题覆盖、发布时间、引用/venue/代码/数据集线索和工程迁移价值排序。阅读时建议重点看：问题定义是否清晰、观测量是否可靠、融合位置是否合理、实验是否覆盖失败案例。
 
 ![筛选方法论](2026-07-03-methodology.jpg)
 
@@ -14,27 +14,32 @@
    - 作者：Syed Ali Kazim, Anas Darwich, Juliette Marais
    - 日期：2026-02-13
    - 链接：http://arxiv.org/abs/2602.12688v1
-   - 推荐理由：主题贴合 GNSS 欺骗与干扰检测，关键词集中在 gnss、gps、spoofing、jamming、interference、integrity、detection、receiver，适合作为今日跟踪论文。
+   - 质量信号：质量分 0.0；venue 7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany
+   - 推荐理由：主题贴合 GNSS 欺骗与干扰检测，关键词集中在 gnss、gps、spoofing、jamming、interference、integrity、detection、receiver。质量信号：venue 7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany，适合作为今日跟踪论文。
 2. **LXD-SLAM: LiDAR+X Dense SLAM with $\sum_{i=0}^{5}C_5^i$ Configurable Sensor Combinations**
    - 作者：Zhong Wang, Lin Zhang, Linfei Li, Ying Shen 等
    - 日期：2026-06-26
    - 链接：http://arxiv.org/abs/2606.27811v1
-   - 推荐理由：主题贴合 多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 fusion、multi-sensor、lidar、visual、camera、imu、gnss、kalman，适合作为今日跟踪论文。
+   - 质量信号：质量分 8.0；代码开源；真实实验
+   - 推荐理由：主题贴合 多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 fusion、multi-sensor、lidar、visual、camera、imu、gnss、kalman。质量信号：代码开源、强调真实实验，适合作为今日跟踪论文。
 3. **Self-supervised Geometry Reasoning for LiDAR Simultaneous Localization and Mapping**
    - 作者：Jiwoo Kim, Jinwoo Lee, Woojae Shin, Giseop Kim 等
    - 日期：2026-06-29
    - 链接：http://arxiv.org/abs/2606.30166v1
-   - 推荐理由：主题贴合 SLAM 与鲁棒里程计，关键词集中在 slam、odometry、localization、mapping、loop、gaussian，适合作为今日跟踪论文。
-4. **Cross-Session 3D LiDAR and Camera Fusion for Robust Localization of Unmanned Aerial Vehicles in GPS-Denied Environments**
-   - 作者：Cong Hoang Quach, Chi Thanh Vo, Dong LT. Tran, Truong Son Nguyen 等
-   - 日期：2026-06-27
-   - 链接：http://arxiv.org/abs/2606.28951v1
-   - 推荐理由：主题贴合 多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 fusion、lidar、visual、camera、inertial、odometry、localization、robust，适合作为今日跟踪论文。
-5. **PL-LIT: A LiDAR-Inertial-Thermal SLAM Using Point-Line Features and Thermographic Mapping**
-   - 作者：Jiawei Xia, Yixiao Feng, Yongliang Shi, Chao Gao 等
-   - 日期：2026-06-28
-   - 链接：http://arxiv.org/abs/2606.29259v1
-   - 推荐理由：主题贴合 多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 lidar、inertial、tightly coupled、kalman、slam、odometry、mapping，适合作为今日跟踪论文。
+   - 质量信号：质量分 0.0；暂无外部质量元数据
+   - 推荐理由：主题贴合 SLAM 与鲁棒里程计，关键词集中在 slam、odometry、localization、mapping、loop、gaussian。质量信号以主题相关和新近度为主，适合作为今日跟踪论文。
+4. **AUSLUN: A Fixed-Hover UAV--USV System for GNSS-Denied Maritime Search and Navigation**
+   - 作者：Siyuan Yang, Zikai Jia, Hailiang Kuang, Xiaoyu He 等
+   - 日期：2026-06-29
+   - 链接：http://arxiv.org/abs/2606.29875v1
+   - 质量信号：质量分 14.0；venue NAVIGATION；代码开源；真实实验
+   - 推荐理由：主题贴合 多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 visual、inertial、gnss、odometry、localization、loop、vio。质量信号：venue NAVIGATION、代码开源、强调真实实验，适合作为今日跟踪论文。
+5. **DL-VINS-Factory: A Modular Framework for Learned Visual Front-Ends in Visual-Inertial SLAM**
+   - 作者：Shoon Kit Lim, Melissa Jia Ying Chong, Ting Yang Ling
+   - 日期：2026-07-02
+   - 链接：http://arxiv.org/abs/2607.01757v1
+   - 质量信号：质量分 8.5；代码开源；数据集/benchmark
+   - 推荐理由：主题贴合 多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 visual、camera、inertial、tightly coupled、slam、odometry、loop。质量信号：代码开源、有数据集/benchmark 线索，适合作为今日跟踪论文。
 
 ## 重点推荐
 
@@ -43,7 +48,8 @@
 - **论文信息**：Syed Ali Kazim, Anas Darwich, Juliette Marais；2026-02-13；eess.SP
 - **原文链接**：http://arxiv.org/abs/2602.12688v1
 - **关键词**：gnss、gps、spoofing、jamming、interference、integrity、detection、receiver
-- **为什么值得读**：这篇论文同时覆盖 GNSS 欺骗与干扰检测，并在标题/摘要中出现 gnss、gps、spoofing、jamming、interference、integrity、detection、receiver 等信号。它适合用来观察该方向近期如何处理鲁棒性、异常检测或融合估计问题。
+- **质量信号**：质量分 0.0；venue 7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany
+- **为什么值得读**：这篇论文同时覆盖 GNSS 欺骗与干扰检测，并在标题/摘要中出现 gnss、gps、spoofing、jamming、interference、integrity、detection、receiver 等信号；质量侧还有 质量分 0.0；venue 7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany。它适合用来观察该方向近期如何处理鲁棒性、异常检测或融合估计问题。
 - **对 GNSS/融合/SLAM 系统的启发**：可借鉴其异常定义和误报抑制思路，把 GNSS 可信度作为状态估计输入的一部分，而不是孤立阈值。
 - **摘要要点**：从题名与摘要看，论文主要关注 GNSS 欺骗/干扰场景下的异常识别与完整性监测；方法线索包括 gnss、gps、spoofing、jamming、interference、integrity。阅读全文时建议重点看 可观测量设计、误报控制、攻击与非攻击故障的区分方式，再判断是否适合迁移到自己的工程链路。
 
@@ -52,7 +58,8 @@
 - **论文信息**：Zhong Wang, Lin Zhang, Linfei Li, Ying Shen 等；2026-06-26；cs.RO
 - **原文链接**：http://arxiv.org/abs/2606.27811v1
 - **关键词**：fusion、multi-sensor、lidar、visual、camera、imu、gnss、kalman、slam、odometry
-- **为什么值得读**：这篇论文同时覆盖 多模态/多传感器融合、SLAM 与鲁棒里程计，并在标题/摘要中出现 fusion、multi-sensor、lidar、visual、camera、imu、gnss、kalman、slam、odometry 等信号。它适合用来观察该方向近期如何处理鲁棒性、异常检测或融合估计问题。
+- **质量信号**：质量分 8.0；代码开源；真实实验
+- **为什么值得读**：这篇论文同时覆盖 多模态/多传感器融合、SLAM 与鲁棒里程计，并在标题/摘要中出现 fusion、multi-sensor、lidar、visual、camera、imu、gnss、kalman、slam、odometry 等信号；质量侧还有 质量分 8.0；代码开源；真实实验。它适合用来观察该方向近期如何处理鲁棒性、异常检测或融合估计问题。
 - **对 GNSS/融合/SLAM 系统的启发**：适合关注传感器时空同步、退化场景切换和外点剔除策略，这些通常决定系统能否从实验室走向实车/无人机部署。
 - **摘要要点**：从题名与摘要看，论文主要关注 多传感器融合定位中的一致性、同步和退化处理；方法线索包括 fusion、multi-sensor、lidar、visual、camera、imu。阅读全文时建议重点看 融合框架、传感器缺失时的降级策略、外点剔除和实时性，再判断是否适合迁移到自己的工程链路。
 
@@ -61,27 +68,30 @@
 - **论文信息**：Jiwoo Kim, Jinwoo Lee, Woojae Shin, Giseop Kim 等；2026-06-29；cs.RO
 - **原文链接**：http://arxiv.org/abs/2606.30166v1
 - **关键词**：slam、odometry、localization、mapping、loop、gaussian
-- **为什么值得读**：这篇论文同时覆盖 SLAM 与鲁棒里程计，并在标题/摘要中出现 slam、odometry、localization、mapping、loop、gaussian 等信号。它适合用来观察该方向近期如何处理鲁棒性、异常检测或融合估计问题。
+- **质量信号**：质量分 0.0；暂无外部质量元数据
+- **为什么值得读**：这篇论文同时覆盖 SLAM 与鲁棒里程计，并在标题/摘要中出现 slam、odometry、localization、mapping、loop、gaussian 等信号；质量侧还有 质量分 0.0；暂无外部质量元数据。它适合用来观察该方向近期如何处理鲁棒性、异常检测或融合估计问题。
 - **对 GNSS/融合/SLAM 系统的启发**：可以从前端观测选择、后端约束建模和回环恢复三个角度拆解，判断它是否适合迁移到自己的 SLAM 栈。
 - **摘要要点**：从题名与摘要看，论文主要关注 SLAM/里程计在复杂环境中的鲁棒状态估计；方法线索包括 slam、odometry、localization、mapping、loop、gaussian。阅读全文时建议重点看 前端几何建模、后端约束、回环或地图表达对鲁棒性的贡献，再判断是否适合迁移到自己的工程链路。
 
-### 4. Cross-Session 3D LiDAR and Camera Fusion for Robust Localization of Unmanned Aerial Vehicles in GPS-Denied Environments
+### 4. AUSLUN: A Fixed-Hover UAV--USV System for GNSS-Denied Maritime Search and Navigation
 
-- **论文信息**：Cong Hoang Quach, Chi Thanh Vo, Dong LT. Tran, Truong Son Nguyen 等；2026-06-27；cs.RO
-- **原文链接**：http://arxiv.org/abs/2606.28951v1
-- **关键词**：fusion、lidar、visual、camera、inertial、odometry、localization、robust
-- **为什么值得读**：这篇论文同时覆盖 多模态/多传感器融合、SLAM 与鲁棒里程计，并在标题/摘要中出现 fusion、lidar、visual、camera、inertial、odometry、localization、robust 等信号。它适合用来观察该方向近期如何处理鲁棒性、异常检测或融合估计问题。
+- **论文信息**：Siyuan Yang, Zikai Jia, Hailiang Kuang, Xiaoyu He 等；2026-06-29；cs.RO
+- **原文链接**：http://arxiv.org/abs/2606.29875v1
+- **关键词**：visual、inertial、gnss、odometry、localization、loop、vio
+- **质量信号**：质量分 14.0；venue NAVIGATION；代码开源；真实实验
+- **为什么值得读**：这篇论文同时覆盖 多模态/多传感器融合、SLAM 与鲁棒里程计，并在标题/摘要中出现 visual、inertial、gnss、odometry、localization、loop、vio 等信号；质量侧还有 质量分 14.0；venue NAVIGATION；代码开源；真实实验。它适合用来观察该方向近期如何处理鲁棒性、异常检测或融合估计问题。
 - **对 GNSS/融合/SLAM 系统的启发**：适合关注传感器时空同步、退化场景切换和外点剔除策略，这些通常决定系统能否从实验室走向实车/无人机部署。
-- **摘要要点**：从题名与摘要看，论文主要关注 多传感器融合定位中的一致性、同步和退化处理；方法线索包括 fusion、lidar、visual、camera、inertial、odometry。阅读全文时建议重点看 融合框架、传感器缺失时的降级策略、外点剔除和实时性，再判断是否适合迁移到自己的工程链路。
+- **摘要要点**：从题名与摘要看，论文主要关注 SLAM/里程计在复杂环境中的鲁棒状态估计；方法线索包括 visual、inertial、gnss、odometry、localization、loop。阅读全文时建议重点看 前端几何建模、后端约束、回环或地图表达对鲁棒性的贡献，再判断是否适合迁移到自己的工程链路。
 
-### 5. PL-LIT: A LiDAR-Inertial-Thermal SLAM Using Point-Line Features and Thermographic Mapping
+### 5. DL-VINS-Factory: A Modular Framework for Learned Visual Front-Ends in Visual-Inertial SLAM
 
-- **论文信息**：Jiawei Xia, Yixiao Feng, Yongliang Shi, Chao Gao 等；2026-06-28；cs.RO
-- **原文链接**：http://arxiv.org/abs/2606.29259v1
-- **关键词**：lidar、inertial、tightly coupled、kalman、slam、odometry、mapping
-- **为什么值得读**：这篇论文同时覆盖 多模态/多传感器融合、SLAM 与鲁棒里程计，并在标题/摘要中出现 lidar、inertial、tightly coupled、kalman、slam、odometry、mapping 等信号。它适合用来观察该方向近期如何处理鲁棒性、异常检测或融合估计问题。
+- **论文信息**：Shoon Kit Lim, Melissa Jia Ying Chong, Ting Yang Ling；2026-07-02；cs.CV
+- **原文链接**：http://arxiv.org/abs/2607.01757v1
+- **关键词**：visual、camera、inertial、tightly coupled、slam、odometry、loop
+- **质量信号**：质量分 8.5；代码开源；数据集/benchmark
+- **为什么值得读**：这篇论文同时覆盖 多模态/多传感器融合、SLAM 与鲁棒里程计，并在标题/摘要中出现 visual、camera、inertial、tightly coupled、slam、odometry、loop 等信号；质量侧还有 质量分 8.5；代码开源；数据集/benchmark。它适合用来观察该方向近期如何处理鲁棒性、异常检测或融合估计问题。
 - **对 GNSS/融合/SLAM 系统的启发**：适合关注传感器时空同步、退化场景切换和外点剔除策略，这些通常决定系统能否从实验室走向实车/无人机部署。
-- **摘要要点**：从题名与摘要看，论文主要关注 SLAM/里程计在复杂环境中的鲁棒状态估计；方法线索包括 lidar、inertial、tightly coupled、kalman、slam、odometry。阅读全文时建议重点看 前端几何建模、后端约束、回环或地图表达对鲁棒性的贡献，再判断是否适合迁移到自己的工程链路。
+- **摘要要点**：从题名与摘要看，论文主要关注 SLAM/里程计在复杂环境中的鲁棒状态估计；方法线索包括 visual、camera、inertial、tightly coupled、slam、odometry。阅读全文时建议重点看 前端几何建模、后端约束、回环或地图表达对鲁棒性的贡献，再判断是否适合迁移到自己的工程链路。
 
 ## 推荐阅读框架
 
@@ -95,4 +105,4 @@ GNSS 相关论文正在从单点接收机检测走向跨传感器、跨平台和
 
 `GNSS spoofing detection`、`PNT integrity`、`LiDAR-Inertial-Visual-GNSS`、`degeneracy-aware odometry`、`multimodal SLAM`、`factor graph fusion`。
 
-> 本文由自动化脚本基于公开论文元数据生成，建议阅读原文后再引用具体实验结论。
+> 本文基于公开论文元数据生成，建议阅读原文后再引用具体实验结论。
