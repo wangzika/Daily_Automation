@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -18,9 +19,17 @@ class ArxivClientError(RuntimeError):
 
 
 class ArxivClient:
-    def __init__(self, user_agent: str = "daily-gnss-slam-digest/0.1", timeout: int = 30) -> None:
+    def __init__(
+        self,
+        user_agent: str = "daily-gnss-slam-digest/0.1",
+        timeout: int = 30,
+        retries: int = 3,
+        retry_delay_seconds: float = 10.0,
+    ) -> None:
         self.user_agent = user_agent
         self.timeout = timeout
+        self.retries = retries
+        self.retry_delay_seconds = retry_delay_seconds
 
     def search(self, query: str, max_results: int = 25, start: int = 0) -> list[Paper]:
         params = {
@@ -32,11 +41,7 @@ class ArxivClient:
         }
         url = f"{ARXIV_API_URL}?{urllib.parse.urlencode(params)}"
         request = urllib.request.Request(url, headers={"User-Agent": self.user_agent})
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                payload = response.read()
-        except OSError as exc:
-            raise ArxivClientError(f"Failed to query arXiv: {exc}") from exc
+        payload = self._open_with_retries(request)
 
         try:
             root = ET.fromstring(payload)
@@ -44,6 +49,25 @@ class ArxivClient:
             raise ArxivClientError(f"Failed to parse arXiv response: {exc}") from exc
 
         return [self._parse_entry(entry) for entry in root.findall("atom:entry", ATOM_NS)]
+
+    def _open_with_retries(self, request: urllib.request.Request) -> bytes:
+        last_error: OSError | None = None
+        for attempt in range(self.retries + 1):
+            try:
+                with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                    return response.read()
+            except urllib.error.HTTPError as exc:
+                last_error = exc
+                if exc.code not in {429, 500, 502, 503, 504} or attempt >= self.retries:
+                    break
+            except OSError as exc:
+                last_error = exc
+                if attempt >= self.retries:
+                    break
+            sleep_for = self.retry_delay_seconds * (attempt + 1)
+            print(f"arXiv query failed ({last_error}); retrying in {sleep_for:.1f}s.")
+            time.sleep(sleep_for)
+        raise ArxivClientError(f"Failed to query arXiv: {last_error}") from last_error
 
     def search_many(self, queries: list[str], max_results_per_query: int = 25) -> list[Paper]:
         papers_by_id: dict[str, Paper] = {}
@@ -79,6 +103,9 @@ class ArxivClient:
         )
         primary = entry.find("arxiv:primary_category", ATOM_NS)
         primary_category = primary.attrib.get("term") if primary is not None else None
+        comment = _optional_clean_text(entry, "arxiv:comment")
+        journal_ref = _optional_clean_text(entry, "arxiv:journal_ref")
+        doi = _optional_clean_text(entry, "arxiv:doi")
 
         return Paper(
             title=title,
@@ -91,6 +118,9 @@ class ArxivClient:
             categories=categories,
             primary_category=primary_category,
             arxiv_id=_extract_arxiv_id(url),
+            comment=comment,
+            journal_ref=journal_ref,
+            doi=doi,
         )
 
 
@@ -103,6 +133,13 @@ def _required_text(entry: ET.Element, path: str) -> str:
 
 def _clean_text(value: str) -> str:
     return " ".join(value.split())
+
+
+def _optional_clean_text(entry: ET.Element, path: str) -> str | None:
+    value = entry.findtext(path, namespaces=ATOM_NS)
+    if not value:
+        return None
+    return _clean_text(value)
 
 
 def _parse_arxiv_datetime(value: str) -> datetime:

@@ -1,0 +1,227 @@
+{
+  "paper_count": 5,
+  "source_dates": [
+    "2026-07-03"
+  ],
+  "hot_topics": [
+    [
+      "SLAM 与鲁棒里程计",
+      4
+    ],
+    [
+      "多模态/多传感器融合",
+      3
+    ],
+    [
+      "GNSS 欺骗与干扰检测",
+      1
+    ]
+  ],
+  "hot_terms": [
+    [
+      "odometry",
+      4
+    ],
+    [
+      "lidar",
+      3
+    ],
+    [
+      "slam",
+      3
+    ],
+    [
+      "localization",
+      3
+    ],
+    [
+      "mapping",
+      3
+    ],
+    [
+      "gnss",
+      2
+    ],
+    [
+      "fusion",
+      2
+    ],
+    [
+      "visual",
+      2
+    ],
+    [
+      "camera",
+      2
+    ],
+    [
+      "kalman",
+      2
+    ],
+    [
+      "loop",
+      2
+    ],
+    [
+      "robust",
+      2
+    ],
+    [
+      "gaussian",
+      2
+    ],
+    [
+      "inertial",
+      2
+    ],
+    [
+      "gps",
+      1
+    ],
+    [
+      "spoofing",
+      1
+    ]
+  ],
+  "hot_directions": [
+    [
+      "SLAM/里程计鲁棒性",
+      4
+    ],
+    [
+      "多模态融合与传感器退化处理",
+      3
+    ],
+    [
+      "GNSS 完整性与欺骗/干扰检测",
+      2
+    ]
+  ],
+  "top_papers": [
+    {
+      "title": "LXD-SLAM: LiDAR+X Dense SLAM with $\\sum_{i=0}^{5}C_5^i$ Configurable Sensor Combinations",
+      "url": "http://arxiv.org/abs/2606.27811v1",
+      "published": "2026-06-26",
+      "score": 104.33,
+      "quality_score": 0.0,
+      "quality_signals": {},
+      "quality_summary": "质量分 0.0；暂无外部质量元数据",
+      "topics": [
+        "多模态/多传感器融合",
+        "SLAM 与鲁棒里程计"
+      ],
+      "matched_terms": [
+        "fusion",
+        "multi-sensor",
+        "lidar",
+        "visual",
+        "camera",
+        "imu",
+        "gnss",
+        "kalman",
+        "slam",
+        "odometry",
+        "localization",
+        "mapping",
+        "loop",
+        "degeneracy",
+        "robust",
+        "gaussian"
+      ],
+      "source_date": "2026-07-03"
+    },
+    {
+      "title": "Cross-Session 3D LiDAR and Camera Fusion for Robust Localization of Unmanned Aerial Vehicles in GPS-Denied Environments",
+      "url": "http://arxiv.org/abs/2606.28951v1",
+      "published": "2026-06-27",
+      "score": 62.64,
+      "quality_score": 0.0,
+      "quality_signals": {},
+      "quality_summary": "质量分 0.0；暂无外部质量元数据",
+      "topics": [
+        "多模态/多传感器融合",
+        "SLAM 与鲁棒里程计"
+      ],
+      "matched_terms": [
+        "fusion",
+        "lidar",
+        "visual",
+        "camera",
+        "inertial",
+        "odometry",
+        "localization",
+        "robust"
+      ],
+      "source_date": "2026-07-03"
+    },
+    {
+      "title": "PL-LIT: A LiDAR-Inertial-Thermal SLAM Using Point-Line Features and Thermographic Mapping",
+      "url": "http://arxiv.org/abs/2606.29259v1",
+      "published": "2026-06-28",
+      "score": 60.82,
+      "quality_score": 0.0,
+      "quality_signals": {},
+      "quality_summary": "质量分 0.0；暂无外部质量元数据",
+      "topics": [
+        "多模态/多传感器融合",
+        "SLAM 与鲁棒里程计"
+      ],
+      "matched_terms": [
+        "lidar",
+        "inertial",
+        "tightly coupled",
+        "kalman",
+        "slam",
+        "odometry",
+        "mapping"
+      ],
+      "source_date": "2026-07-03"
+    },
+    {
+      "title": "GNSS Jamming Detection with Automatic Gain Control (AGC) and Carrier-to-Noise Ratio Density (CNO) Observables from a COTS receiver",
+      "url": "http://arxiv.org/abs/2602.12688v1",
+      "published": "2026-02-13",
+      "score": 56.06,
+      "quality_score": 0.0,
+      "quality_signals": {},
+      "quality_summary": "质量分 0.0；暂无外部质量元数据",
+      "topics": [
+        "GNSS 欺骗与干扰检测"
+      ],
+      "matched_terms": [
+        "gnss",
+        "gps",
+        "spoofing",
+        "jamming",
+        "interference",
+        "integrity",
+        "detection",
+        "receiver"
+      ],
+      "source_date": "2026-07-03"
+    },
+    {
+      "title": "Self-supervised Geometry Reasoning for LiDAR Simultaneous Localization and Mapping",
+      "url": "http://arxiv.org/abs/2606.30166v1",
+      "published": "2026-06-29",
+      "score": 51.6,
+      "quality_score": 0.0,
+      "quality_signals": {},
+      "quality_summary": "质量分 0.0；暂无外部质量元数据",
+      "topics": [
+        "SLAM 与鲁棒里程计"
+      ],
+      "matched_terms": [
+        "slam",
+        "odometry",
+        "localization",
+        "mapping",
+        "loop",
+        "gaussian"
+      ],
+      "source_date": "2026-07-03"
+    }
+  ],
+  "code_papers": [],
+  "venue_papers": []
+}

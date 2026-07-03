@@ -13,6 +13,7 @@ from .config import DEFAULT_OUTPUT_DIR, TOPICS
 from .notify import describe_notification_result, notify_draft_created, notify_publish_issue
 from .recommender import recommend
 from .sample_data import SAMPLE_PAPERS
+from .semantic_scholar import SemanticScholarClient, enrich_papers
 from .wechat import WeChatConfig, WeChatPublisher, WeChatPublisherError
 
 
@@ -23,8 +24,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.sample:
         papers = SAMPLE_PAPERS
     else:
-        client = ArxivClient()
+        client = ArxivClient(retries=args.arxiv_retries, retry_delay_seconds=args.arxiv_retry_delay)
         papers = client.search_many([topic.query for topic in TOPICS], max_results_per_query=args.per_topic)
+
+    if args.semantic_scholar == "on" and not args.sample:
+        print(f"Enriching up to {args.quality_enrich_limit} papers with Semantic Scholar metadata.")
+        papers = enrich_papers(
+            papers,
+            client=SemanticScholarClient(),
+            max_papers=args.quality_enrich_limit,
+            delay_seconds=args.semantic_scholar_delay,
+        )
 
     recommendations = recommend(papers, limit=args.limit, days_back=args.days_back)
     if not recommendations:
@@ -118,7 +128,31 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=int(os.getenv("DIGEST_LIMIT", "5")))
     parser.add_argument("--days-back", type=int, default=int(os.getenv("DIGEST_DAYS_BACK", "180")))
     parser.add_argument("--per-topic", type=int, default=int(os.getenv("DIGEST_PER_TOPIC", "25")))
+    parser.add_argument("--arxiv-retries", type=int, default=int(os.getenv("ARXIV_RETRIES", "3")))
+    parser.add_argument(
+        "--arxiv-retry-delay",
+        type=float,
+        default=float(os.getenv("ARXIV_RETRY_DELAY_SECONDS", "10.0")),
+    )
     parser.add_argument("--issue-date", help="Override issue date, format YYYY-MM-DD.")
     parser.add_argument("--publish-mode", choices=("none", "draft", "publish"), default=None)
     parser.add_argument("--sample", action="store_true", help="Use bundled sample papers instead of querying arXiv.")
+    parser.add_argument(
+        "--semantic-scholar",
+        choices=("off", "on"),
+        default=os.getenv("SEMANTIC_SCHOLAR_ENRICH", "off"),
+        help="Enrich arXiv papers with citation and venue metadata from Semantic Scholar.",
+    )
+    parser.add_argument(
+        "--quality-enrich-limit",
+        type=int,
+        default=int(os.getenv("QUALITY_ENRICH_LIMIT", "30")),
+        help="Maximum number of candidate papers to enrich with external quality metadata.",
+    )
+    parser.add_argument(
+        "--semantic-scholar-delay",
+        type=float,
+        default=float(os.getenv("SEMANTIC_SCHOLAR_DELAY_SECONDS", "1.0")),
+        help="Delay between Semantic Scholar requests, in seconds.",
+    )
     return parser.parse_args(argv)

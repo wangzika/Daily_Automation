@@ -72,6 +72,8 @@ export PYTHONPATH="$PROJECT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
 
 WECHAT_MODE="${AUTOMATION_WECHAT_MODE:-${WECHAT_PUBLISH_MODE:-draft}}"
 DEEPDIVE_MODE="${AUTOMATION_DEEPDIVE_MODE:-$WECHAT_MODE}"
+WEEKLY_SUMMARY_ENABLED="${WEEKLY_SUMMARY_ENABLED:-1}"
+WEEKLY_SUMMARY_DAY="${WEEKLY_SUMMARY_DAY:-5}"
 STATUS=0
 STEP_LINES=()
 WARNINGS=()
@@ -108,6 +110,11 @@ run_step() {
 validate_mode() {
   local mode="$1"
   [[ "$mode" == "none" || "$mode" == "draft" || "$mode" == "publish" ]]
+}
+
+is_enabled() {
+  local value="$1"
+  [[ "$value" != "0" && "$value" != "false" && "$value" != "False" && "$value" != "no" && "$value" != "off" ]]
 }
 
 github_commit_url() {
@@ -226,6 +233,7 @@ echo "Run date: $RUN_DATE"
 echo "Digest JSON: $DIGEST_JSON"
 echo "WeChat mode: $WECHAT_MODE"
 echo "Deep-dive mode: $DEEPDIVE_MODE"
+echo "Weekly summary: $WEEKLY_SUMMARY_ENABLED on weekday $WEEKLY_SUMMARY_DAY"
 
 acquire_lock
 warn_missing_optional_command "pdftotext" "PDF text extraction may be weaker."
@@ -249,6 +257,9 @@ if [[ $STATUS -eq 0 ]]; then
       WARNINGS+=("Daily digest step exited $DIGEST_RC, but $DIGEST_JSON exists, so deep-dive generation continued.")
     fi
     run_step "Generate deep-dive articles and WeChat drafts" ./scripts/generate_deepdives.sh "$DEEPDIVE_MODE"
+    if is_enabled "$WEEKLY_SUMMARY_ENABLED" && [[ "$(date -j -f "%F" "$RUN_DATE" "+%u" 2>/dev/null || date -d "$RUN_DATE" "+%u" 2>/dev/null || date "+%u")" == "$WEEKLY_SUMMARY_DAY" ]]; then
+      run_step "Generate weekly hot-topic summary" ./scripts/generate_weekly_summary.sh "$RUN_DATE"
+    fi
   else
     echo "Deep-dive generation skipped: digest JSON does not exist: $DIGEST_JSON" >&2
     STEP_LINES+=("Generate deep-dive articles and WeChat drafts: skipped, missing digest JSON")

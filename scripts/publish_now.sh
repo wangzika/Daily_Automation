@@ -23,14 +23,17 @@ else
   PYTHON=python3
 fi
 
-EXTRA_ARGS=()
 if [[ -n "${DIGEST_DATE:-}" ]]; then
-  EXTRA_ARGS+=(--issue-date "$DIGEST_DATE")
+  PYTHONPATH="$PROJECT_DIR/src${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON" -m daily_gnss_slam_digest \
+    --output-dir "${DIGEST_OUTPUT_DIR:-outputs}" \
+    --limit "${DIGEST_LIMIT:-5}" \
+    --days-back "${DIGEST_DAYS_BACK:-180}" \
+    --publish-mode "$MODE" \
+    --issue-date "$DIGEST_DATE"
+else
+  PYTHONPATH="$PROJECT_DIR/src${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON" -m daily_gnss_slam_digest \
+    --output-dir "${DIGEST_OUTPUT_DIR:-outputs}" \
+    --limit "${DIGEST_LIMIT:-5}" \
+    --days-back "${DIGEST_DAYS_BACK:-180}" \
+    --publish-mode "$MODE"
 fi
-
-PYTHONPATH="$PROJECT_DIR/src${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON" -m daily_gnss_slam_digest \
-  --output-dir "${DIGEST_OUTPUT_DIR:-outputs}" \
-  --limit "${DIGEST_LIMIT:-5}" \
-  --days-back "${DIGEST_DAYS_BACK:-180}" \
-  --publish-mode "$MODE" \
-  "${EXTRA_ARGS[@]}"

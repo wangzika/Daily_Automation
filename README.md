@@ -19,6 +19,26 @@ python -m daily_gnss_slam_digest --publish-mode none
 - `YYYY-MM-DD-gnss-slam-digest.html`
 - `YYYY-MM-DD-gnss-slam-digest.json`
 
+## 选题质量优化
+
+推荐器现在不只看关键词和时间，还会做标题级去重，并把质量信号纳入排序：
+
+- 引用信号：开启 Semantic Scholar 增强后，会读取 `citationCount`、`influentialCitationCount`。
+- venue 信号：从 arXiv `comment`、`journal_ref` 和 Semantic Scholar venue 中识别 ICRA、IROS、RSS、RA-L、T-RO、ION GNSS、PLANS 等。
+- 开源/复现信号：识别 GitHub/GitLab/Code Ocean 链接，以及 `code`、`benchmark`、`dataset`、`real-world` 等摘要线索。
+- 工程信号：真实实验、数据集、benchmark 会加权；纯 survey/review 会轻微降权。
+
+`.env` 可配置：
+
+```bash
+SEMANTIC_SCHOLAR_ENRICH=on
+QUALITY_ENRICH_LIMIT=30
+SEMANTIC_SCHOLAR_DELAY_SECONDS=1.0
+SEMANTIC_SCHOLAR_API_KEY=
+```
+
+没有 Semantic Scholar API key 也可以运行；如果接口限流或不可用，脚本会跳过外部增强，继续按本地质量信号出稿。
+
 ## 微信公众号配置
 
 复制环境变量模板：
@@ -130,7 +150,7 @@ PYTHONPATH=src python scripts/upload_cover_to_wechat.py outputs/wechat-cover-gns
 
 ## 每日自动化和 GitHub 提交
 
-总控脚本会按顺序执行：生成每日推荐、创建公众号草稿、生成单篇论文解读草稿、提交并推送到 GitHub、发送总结邮件。
+总控脚本会按顺序执行：生成每日推荐、创建公众号草稿、生成单篇论文解读草稿、按周生成热点汇总、提交并推送到 GitHub、发送总结邮件。
 
 ```bash
 ./scripts/daily_automation.sh
@@ -145,6 +165,9 @@ AUTOMATION_TIME=08:30
 AUTOMATION_WECHAT_MODE=draft
 AUTOMATION_DEEPDIVE_MODE=draft
 AUTOMATION_LOG_TAIL_LINES=60
+WEEKLY_SUMMARY_ENABLED=1
+WEEKLY_SUMMARY_DAY=5
+WEEKLY_SUMMARY_DAYS=7
 GITHUB_REPO_URL=git@github.com:your-name/your-repo.git
 GITHUB_BRANCH=master
 GIT_AUTHOR_NAME="GNSS Paper Bot"
@@ -152,6 +175,14 @@ GIT_AUTHOR_EMAIL=your@email.com
 ```
 
 `AUTOMATION_WECHAT_MODE` 和 `AUTOMATION_DEEPDIVE_MODE` 支持 `none`、`draft`、`publish`。如果当前目录还不是 git 仓库，脚本会在 `GITHUB_REPO_URL` 存在时自动 `git init`、添加 `origin` 并推送。`.env`、日志、论文 PDF 和中间缓存不会提交；最终文章、正文图和配置代码会提交。
+
+单独生成本周热点汇总：
+
+```bash
+./scripts/generate_weekly_summary.sh
+```
+
+周报会写入 `outputs/weekly/`，内容包括热点方向、高频关键词、有代码/复现线索、venue/引用线索和本周最值得追的论文。
 
 在 macOS 上安装每日定时任务：
 

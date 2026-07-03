@@ -20,11 +20,11 @@ def build_markdown(
     lines: list[str] = [
         f"# {title}",
         "",
-        "今天的推荐聚焦三个交叉点：GNSS 欺骗/干扰检测、多模态融合定位、SLAM 与鲁棒里程计。筛选逻辑优先考虑主题相关性、新近度，以及是否能给工程系统带来可验证的思路。",
+        "今天的推荐聚焦三个交叉点：GNSS 欺骗/干扰检测、多模态融合定位、SLAM 与鲁棒里程计。筛选逻辑优先考虑主题相关性、新近度、引用/venue/开源代码等质量信号，以及是否能给工程系统带来可验证的思路。",
         "",
         "## 筛选方法论",
         "",
-        "这份日报不是简单按 arXiv 最新排序，而是先用主题查询收集候选论文，再按关键词命中、主题覆盖、发布时间和工程迁移价值进行排序。阅读时建议重点看：问题定义是否清晰、观测量是否可靠、融合位置是否合理、实验是否覆盖失败案例。",
+        "这份日报不是简单按 arXiv 最新排序，而是先用主题查询收集候选论文，再做标题级去重，并按关键词命中、主题覆盖、发布时间、引用/venue/代码/数据集线索和工程迁移价值排序。阅读时建议重点看：问题定义是否清晰、观测量是否可靠、融合位置是否合理、实验是否覆盖失败案例。",
         "",
     ]
     if "methodology" in image_paths:
@@ -39,6 +39,7 @@ def build_markdown(
                 f"   - 作者：{_format_authors(paper.authors)}",
                 f"   - 日期：{paper.published.date().isoformat()}",
                 f"   - 链接：{paper.url}",
+                f"   - 质量信号：{_quality_summary(item)}",
                 f"   - 推荐理由：{item.reason}",
             ]
         )
@@ -53,6 +54,7 @@ def build_markdown(
                 f"- **论文信息**：{_format_authors(paper.authors)}；{paper.published.date().isoformat()}；{paper.primary_category or 'arXiv'}",
                 f"- **原文链接**：{paper.url}",
                 f"- **关键词**：{_format_terms(item.matched_terms)}",
+                f"- **质量信号**：{_quality_summary(item)}",
                 f"- **为什么值得读**：{_analysis_for(item)}",
                 f"- **对 GNSS/融合/SLAM 系统的启发**：{_engineering_takeaway(item)}",
                 f"- **摘要要点**：{_abstract_digest(item)}",
@@ -94,11 +96,12 @@ def build_html(
             'line-height:1.85;font-size:15px;">'
             "今天的推荐聚焦 <strong>GNSS 欺骗/干扰检测</strong>、"
             "<strong>多模态融合定位</strong>、<strong>SLAM 与鲁棒里程计</strong>。"
-            "筛选逻辑优先考虑主题相关性、新近度，以及是否能给工程系统带来可验证的思路。"
+            "筛选逻辑优先考虑主题相关性、新近度、引用/venue/开源代码等质量信号，"
+            "以及是否能给工程系统带来可验证的思路。"
             "</section>"
         ),
         _section_title("筛选方法论"),
-        _paragraph("这份日报不是简单按 arXiv 最新排序，而是先用主题查询收集候选论文，再按关键词命中、主题覆盖、发布时间和工程迁移价值进行排序。读者可以把它当成一个每日研究雷达：先定位方向，再判断是否值得阅读全文。"),
+        _paragraph("这份日报不是简单按 arXiv 最新排序，而是先用主题查询收集候选论文，再做标题级去重，并按关键词命中、主题覆盖、发布时间、引用/venue/代码/数据集线索和工程迁移价值排序。读者可以把它当成一个每日研究雷达：先定位方向，再判断是否值得阅读全文。"),
     ]
     if "methodology" in image_urls:
         body_parts.append(_article_image(image_urls["methodology"], "方法论：从论文流到工程判断"))
@@ -113,6 +116,7 @@ def build_html(
             f'<p style="margin:0 0 8px;color:#0b9984;font-size:13px;">#{index} · {paper.published.date().isoformat()} · {html.escape(paper.primary_category or "arXiv")}</p>'
             f'<p style="margin:0 0 8px;color:#17272d;font-weight:700;font-size:16px;line-height:1.55;">{html.escape(paper.title)}</p>'
             f'<p style="margin:0;color:#687d84;font-size:13px;line-height:1.7;">{html.escape(_format_authors(paper.authors))}</p>'
+            f'<p style="margin:8px 0 0;color:#40545c;font-size:13px;line-height:1.7;">质量信号：{html.escape(_quality_summary(item))}</p>'
             "</section>"
         )
 
@@ -184,10 +188,36 @@ def _format_terms(terms: tuple[str, ...]) -> str:
     return "、".join(terms[:10]) if terms else "GNSS、fusion、SLAM"
 
 
+def _quality_summary(item: RecommendedPaper) -> str:
+    signals = item.quality_signals
+    parts: list[str] = [f"质量分 {item.quality_score:.1f}"]
+    citation_count = signals.get("citation_count")
+    if isinstance(citation_count, int):
+        parts.append(f"引用 {citation_count}")
+    influential_count = signals.get("influential_citation_count")
+    if isinstance(influential_count, int) and influential_count > 0:
+        parts.append(f"高影响引用 {influential_count}")
+    venue = signals.get("venue")
+    if isinstance(venue, str) and venue:
+        parts.append(f"venue {venue}")
+    if signals.get("code_url"):
+        parts.append("代码开源")
+    elif signals.get("code_signal"):
+        parts.append("有代码线索")
+    if signals.get("dataset_signal"):
+        parts.append("数据集/benchmark")
+    if signals.get("real_world_signal"):
+        parts.append("真实实验")
+    if len(parts) == 1:
+        parts.append("暂无外部质量元数据")
+    return "；".join(parts[:6])
+
+
 def _analysis_for(item: RecommendedPaper) -> str:
     topics = "、".join(item.topic_scores.keys()) or "相关方向"
     terms = _format_terms(item.matched_terms)
-    return f"这篇论文同时覆盖 {topics}，并在标题/摘要中出现 {terms} 等信号。它适合用来观察该方向近期如何处理鲁棒性、异常检测或融合估计问题。"
+    quality = _quality_summary(item)
+    return f"这篇论文同时覆盖 {topics}，并在标题/摘要中出现 {terms} 等信号；质量侧还有 {quality}。它适合用来观察该方向近期如何处理鲁棒性、异常检测或融合估计问题。"
 
 
 def _engineering_takeaway(item: RecommendedPaper) -> str:
@@ -248,8 +278,8 @@ def _article_image(src: str, caption: str) -> str:
 def _method_cards() -> str:
     items = (
         ("1", "先看问题", "欺骗/干扰、融合退化，还是 SLAM 鲁棒性？"),
-        ("2", "再看观测", "C/N0、AGC、GNSS、IMU、LiDAR、视觉如何进入估计？"),
-        ("3", "最后看迁移", "误报率、实时性、失败案例和数据集是否可信？"),
+        ("2", "再看质量", "引用、venue、代码、数据集和真实实验线索是否足够？"),
+        ("3", "最后看迁移", "误报率、实时性、失败案例和传感器配置是否可信？"),
     )
     cards = []
     for number, title, body in items:
@@ -272,6 +302,7 @@ def _paper_card(index: int, item: RecommendedPaper) -> str:
         f'<h3 style="margin:0 0 12px;color:#10272f;font-size:18px;line-height:1.5;font-weight:800;">{html.escape(paper.title)}</h3>'
         f'<p style="margin:0 0 12px;color:#72868c;font-size:13px;line-height:1.7;">作者：{html.escape(_format_authors(paper.authors))}</p>'
         f'{_label_block("关键词", _format_terms(item.matched_terms))}'
+        f'{_label_block("质量信号", _quality_summary(item))}'
         f'{_label_block("为什么值得读", _analysis_for(item))}'
         f'{_label_block("工程启发", _engineering_takeaway(item))}'
         f'{_label_block("摘要要点", _abstract_digest(item))}'
@@ -320,9 +351,19 @@ def _to_json(recommendations: list[RecommendedPaper]) -> str:
                 "updated": paper.updated.isoformat(),
                 "categories": list(paper.categories),
                 "primary_category": paper.primary_category,
+                "arxiv_id": paper.arxiv_id,
+                "comment": paper.comment,
+                "journal_ref": paper.journal_ref,
+                "doi": paper.doi,
+                "citation_count": paper.citation_count,
+                "influential_citation_count": paper.influential_citation_count,
+                "venue": paper.venue,
+                "code_url": paper.code_url,
                 "score": item.score,
                 "topic_scores": item.topic_scores,
                 "matched_terms": list(item.matched_terms),
+                "quality_score": item.quality_score,
+                "quality_signals": item.quality_signals,
                 "reason": item.reason,
             }
         )
