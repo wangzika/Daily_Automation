@@ -230,11 +230,12 @@ def build_deepdive_markdown(
     ]
     for i, figure in enumerate(figures, start=1):
         key = f"figure_{i}"
+        figure_caption = _display_figure_caption(figure.caption, i)
         lines.extend(
             [
-                f"![{figure.caption}]({image_map.get(key, figure.path.name)})",
+                f"![{figure_caption}]({image_map.get(key, figure.path.name)})",
                 "",
-                f"图 {i}：{figure.caption}",
+                figure_caption,
                 "",
                 _figure_reading(paper, reading, figure, i),
                 "",
@@ -293,11 +294,12 @@ def build_deepdive_html(
     for i, figure in enumerate(figures, start=1):
         key = f"figure_{i}"
         src = image_map.get(key, figure.path.name)
+        figure_caption = _display_figure_caption(figure.caption, i)
         parts.extend(
             [
                 '<section style="margin:0 0 22px;padding:14px;border:1px solid #e1eeee;border-radius:10px;background:#ffffff;">',
-                f'<img src="{html.escape(src)}" alt="{html.escape(figure.caption)}" style="display:block;width:100%;height:auto;border-radius:6px;"/>',
-                f'<p style="margin:10px 0 8px;color:#0b9984;font-size:13px;font-weight:700;">图 {i} · {html.escape(figure.caption)}</p>',
+                f'<img src="{html.escape(src)}" alt="{html.escape(figure_caption)}" style="display:block;width:100%;height:auto;border-radius:6px;"/>',
+                f'<p style="margin:10px 0 8px;color:#0b9984;font-size:13px;font-weight:700;line-height:1.6;">{html.escape(figure_caption)}</p>',
                 f'<p style="margin:0;color:#43565d;font-size:14px;line-height:1.85;">{html.escape(_figure_reading(paper, reading, figure, i))}</p>',
                 "</section>",
             ]
@@ -338,7 +340,7 @@ def _extract_figure_captions(pdf_path: Path) -> list[str]:
     for line in result.stdout.splitlines():
         match = pattern.match(line.strip())
         if match:
-            caption = " ".join(match.group(1).split())
+            caption = _clean_figure_caption(match.group(1))
             if caption not in captions:
                 captions.append(caption[:180])
     return captions
@@ -496,8 +498,37 @@ def _ink_ratio(image: Image.Image) -> float:
 
 def _caption_for(captions: list[str], index: int) -> str:
     if 0 <= index - 1 < len(captions):
-        return captions[index - 1]
+        return _clean_figure_caption(captions[index - 1])
     return f"论文原图 {index}（从 PDF 直接提取）"
+
+
+def _display_figure_caption(caption: str, display_index: int) -> str:
+    caption = _clean_figure_caption(caption)
+    match = re.match(r"^(?:Fig(?:ure)?\.?)\s*(\d+)\s*[.:]?\s*(.*)$", caption, re.IGNORECASE)
+    prefix = "主图" if display_index == 1 else "论文图"
+    if match:
+        body = _short_figure_caption_body(match.group(2))
+        return f"{prefix}：{body}" if body else prefix
+    body = _short_figure_caption_body(caption)
+    return f"{prefix}：{body}" if body else prefix
+
+
+def _clean_figure_caption(caption: str) -> str:
+    caption = " ".join(caption.split())
+    caption = re.sub(r"([A-Za-z])-\s+([a-z])", r"\1\2", caption)
+    caption = caption.replace("ﬁ", "fi").replace("ﬂ", "fl")
+    return caption.strip()
+
+
+def _short_figure_caption_body(caption: str) -> str:
+    caption = _clean_figure_caption(caption)
+    if not caption:
+        return ""
+    first_sentence = re.split(r"(?<=[.!?])\s+", caption, maxsplit=1)[0]
+    first_sentence = first_sentence.rstrip(" .。")
+    if len(first_sentence) <= 82:
+        return first_sentence
+    return first_sentence[:79].rstrip(" -:：,，.;。") + "..."
 
 
 def _select_cover_figure(figures: list[DeepDiveFigure]) -> DeepDiveFigure | None:

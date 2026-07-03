@@ -42,15 +42,15 @@ LXD-SLAM 盯住的是机器人部署里的一个硬问题：平台上可能有 L
 
 ### 3. 主图和关键图解：先沿着数据流走一遍
 
-![Fig. 1: System Overview. The proposed LXD-SLAM framework infrastructure is anchored by a primary LiDAR and architected to support the tight-coupled fusion](figure-1.jpg)
+![主图：System Overview](figure-1.jpg)
 
-图 1：Fig. 1: System Overview. The proposed LXD-SLAM framework infrastructure is anchored by a primary LiDAR and architected to support the tight-coupled fusion
+主图：System Overview
 
 这张图适合当作论文的“主地图”来读：左侧是传感器或数据输入，中间是同步、融合、检测、建图或优化模块，右侧是定位、地图或告警输出。读它时不要急着看细节，先沿着箭头走一遍数据流，就能知道作者到底把创新点放在前端观测、后端优化，还是系统组织方式上。
 
-![Fig. 2: Hierarchical map organization. The continuous 3D workspace is](figure-2.jpg)
+![论文图：Hierarchical map organization](figure-2.jpg)
 
-图 2：Fig. 2: Hierarchical map organization. The continuous 3D workspace is
+论文图：Hierarchical map organization
 
 第二张图适合看对比和细节：不同传感器组合、不同场景或不同退化条件下，系统是否还能保持地图一致和定位稳定。
 

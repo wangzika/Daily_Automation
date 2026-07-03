@@ -42,15 +42,15 @@
 
 ### 3. 主图和关键图解：先沿着数据流走一遍
 
-![Figure 2. Experimental setup used for GNSS interference detection.](figure-2.jpg)
+![主图：Experimental setup used for GNSS interference detection](figure-2.jpg)
 
-图 1：Figure 2. Experimental setup used for GNSS interference detection.
+主图：Experimental setup used for GNSS interference detection
 
 这张图适合当作论文的“主地图”来读：左侧是传感器或数据输入，中间是同步、融合、检测、建图或优化模块，右侧是定位、地图或告警输出。读它时不要急着看细节，先沿着箭头走一遍数据流，就能知道作者到底把创新点放在前端观测、后端优化，还是系统组织方式上。
 
-![Figure 1. Time-Frequency representation of linear chirp.](figure-1.jpg)
+![论文图：Time-Frequency representation of linear chirp](figure-1.jpg)
 
-图 2：Figure 1. Time-Frequency representation of linear chirp.
+论文图：Time-Frequency representation of linear chirp
 
 这张图不是最终检测结果，而是在说明干扰信号本身长什么样：频率会随时间扫过接收机关注的频段。读它时要把它当成后面 AGC/C/N0 异常的“起因”，先理解攻击输入，再看接收机内部观测量如何响应。
 

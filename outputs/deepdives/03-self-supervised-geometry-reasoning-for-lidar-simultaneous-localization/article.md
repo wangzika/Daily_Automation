@@ -42,15 +42,15 @@
 
 ### 3. 主图和关键图解：先沿着数据流走一遍
 
-![Fig. 2: A visualization illustrating how the underlying geom-](figure-1.jpg)
+![主图：A visualization illustrating how the underlying geom-](figure-1.jpg)
 
-图 1：Fig. 2: A visualization illustrating how the underlying geom-
+主图：A visualization illustrating how the underlying geom-
 
 这张图是在解释几何建模或约束构造。读图时先分清输入点、局部几何、对应关系和位姿变换分别是什么，再看这些量如何进入 SLAM 前端或后端。
 
-![Fig. 3: Raw and densified point clouds. (a) Raw 32-channel](figure-2.jpg)
+![论文图：Raw and densified point clouds](figure-2.jpg)
 
-图 2：Fig. 3: Raw and densified point clouds. (a) Raw 32-channel
+论文图：Raw and densified point clouds
 
 这张图更适合看结果验证：轨迹是否贴近真值、迭代是否收敛、地图或局部结构是否因为新模块变得更稳定。
 
