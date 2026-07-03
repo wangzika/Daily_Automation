@@ -406,6 +406,44 @@ outputs/email_commands/processed_commands.json
 
 第一条只预览，第二条才会真正生成。定时任务不要加这个参数，否则旧指令可能被重复执行。
 
+### 10.5 `Processed email commands: 0` 怎么看？
+
+手动执行：
+
+```bash
+./scripts/process_email_commands.sh --dry-run
+```
+
+脚本会打印类似信息：
+
+```text
+Scanned candidate messages: 62 (unread: 43, recent: 43)
+Matched command emails: 1; skipped already processed: 0; skipped old read: 1
+Processed email commands: 0
+```
+
+含义如下：
+
+| 输出项 | 含义 |
+| --- | --- |
+| `Scanned candidate messages` | 本次实际检查了多少封候选邮件 |
+| `unread` | 当前未读邮件数量 |
+| `recent` | 最近 `EMAIL_COMMAND_RECENT_DAYS` 天内的邮件数量 |
+| `Matched command emails` | 发件人、主题和正文格式都匹配的邮件指令数量 |
+| `skipped already processed` | 已经执行过，因本地指纹记录被跳过 |
+| `skipped old read` | 已读旧指令，时间早于最近一次执行输出，默认防重复跳过 |
+
+如果 `Matched command emails` 是 0，通常是主题没有包含 `论文指令`、发件人不在白名单、正文没有写 `关键词`，或者邮件太旧超过了 `EMAIL_COMMAND_RECENT_DAYS`。
+
+如果 `skipped old read` 是 1，说明脚本找到了那封指令，但它已经被读过，而且比最近一次输出更早。此时如果你确认要重放，用：
+
+```bash
+./scripts/process_email_commands.sh --dry-run --force-recent
+./scripts/process_email_commands.sh --force-recent
+```
+
+如果 `skipped already processed` 是 1，说明这封邮件已经正式执行过。要重新执行，建议重新发一封新邮件，而不是改本地状态文件。
+
 ## 11. 输出文件和日志
 
 每日推荐文章输出在：

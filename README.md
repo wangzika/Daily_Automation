@@ -181,7 +181,46 @@ GIT_AUTHOR_EMAIL=your@email.com
 
 `AUTOMATION_WECHAT_MODE` 和 `AUTOMATION_DEEPDIVE_MODE` 支持 `none`、`draft`、`publish`。如果 launchd 使用的系统 Python 缺少依赖，可以把 `AUTOMATION_PYTHON` 设置为可用解释器，例如 `/Users/wangzhibo/miniconda3/bin/python`。总控脚本会自动设置 `EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES=1`，只保留最后一封总结邮件；如果想调试子步骤邮件，可以在 `.env` 里显式设为 `0`。如果当前目录还不是 git 仓库，脚本会在 `GITHUB_REPO_URL` 存在时自动 `git init`、添加 `origin` 并推送。`.env`、日志、论文 PDF 和中间缓存不会提交；最终文章、正文图和配置代码会提交。
 
-也可以开启邮件指令控制：发一封主题包含 `论文指令` 的邮件，在正文写 `关键词`、`任务`、`模式`，脚本会按指定关键词生成推荐和论文解读。配置和邮件格式见 [docs/automation-guide.md](docs/automation-guide.md)。
+也可以开启邮件指令控制：发一封主题包含 `论文指令` 的邮件，在正文写 `关键词`、`任务`、`模式`，脚本会按指定关键词生成推荐、论文解读或周报。邮件扫描会同时检查未读邮件和最近几天的已读邮件，并用本地指纹文件避免重复执行。
+
+常用邮件指令：
+
+```text
+主题：论文指令：GNSS 干扰与鲁棒定位
+
+关键词：GNSS jamming, spoofing detection, robust localization
+任务：digest, deepdive
+模式：draft
+数量：5
+解读数量：2
+检索天数：180
+```
+
+只生成推荐总结、不生成单篇论文解读：
+
+```text
+主题：论文指令：只生成总结
+
+关键词：GNSS spoofing detection, C/N0, AGC
+任务：总结
+模式：draft
+数量：5
+```
+
+本地测试邮箱指令：
+
+```bash
+./scripts/process_email_commands.sh --dry-run
+```
+
+如果要手动重放一封最近已读的旧指令：
+
+```bash
+./scripts/process_email_commands.sh --dry-run --force-recent
+./scripts/process_email_commands.sh --force-recent
+```
+
+配置、完整字段和排查方法见 [docs/automation-guide.md](docs/automation-guide.md)。
 
 单独生成本周热点汇总：
 
