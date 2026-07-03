@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import unittest
 from email.message import EmailMessage
+from pathlib import Path
 
 from daily_gnss_slam_digest.config import arxiv_query_from_keywords, parse_keyword_text, topic_from_keywords
-from daily_gnss_slam_digest.email_control import EmailCommandConfig, _newest_message_ids, command_from_message
+from daily_gnss_slam_digest.email_control import (
+    EmailCommandConfig,
+    _deepdive_command,
+    _newest_message_ids,
+    command_from_message,
+)
 from daily_gnss_slam_digest.models import Paper
 from daily_gnss_slam_digest.recommender import recommend
 
@@ -82,6 +88,14 @@ class KeywordCommandTest(unittest.TestCase):
 
         self.assertEqual(_newest_message_ids(ids, 3), [b"6", b"5", b"4"])
 
+    def test_deepdive_command_honors_email_limit(self) -> None:
+        command = PaperCommandForTest(deepdive_limit=1)
+
+        args = _deepdive_command(command, Path("digest.json"), Path("run"), "python", {"DEEPDIVE_LIMIT": "3"})
+
+        limit_index = args.index("--limit")
+        self.assertEqual(args[limit_index + 1], "1")
+
 
 def _paper(title: str, abstract: str) -> Paper:
     published = datetime(2026, 7, 3, tzinfo=timezone.utc)
@@ -96,6 +110,19 @@ def _paper(title: str, abstract: str) -> Paper:
         categories=("cs.RO",),
         primary_category="cs.RO",
     )
+
+
+class PaperCommandForTest:
+    keywords = "GNSS jamming"
+    tasks = ("digest", "deepdive")
+    mode = "draft"
+    digest_limit = 3
+    days_back = 180
+    source_subject = "论文指令"
+    source_sender = "reader@qq.com"
+
+    def __init__(self, *, deepdive_limit: int | None) -> None:
+        self.deepdive_limit = deepdive_limit
 
 
 if __name__ == "__main__":

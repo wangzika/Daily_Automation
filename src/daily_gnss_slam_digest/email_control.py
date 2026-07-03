@@ -205,16 +205,22 @@ def execute_command(command: PaperCommand) -> dict[str, object]:
         env["DEEPDIVE_LIMIT"] = str(command.deepdive_limit)
     if command.days_back is not None:
         env["DIGEST_DAYS_BACK"] = str(command.days_back)
+    env["PYTHONPATH"] = (
+        f"{Path.cwd() / 'src'}{os.pathsep}{env['PYTHONPATH']}"
+        if env.get("PYTHONPATH")
+        else str(Path.cwd() / "src")
+    )
 
     steps: list[dict[str, object]] = []
+    python = _python_executable(env)
     if "digest" in command.tasks:
-        steps.append(_run_step("Generate keyword digest", ["./scripts/publish_now.sh", command.mode], env))
+        steps.append(_run_step("Generate keyword digest", _digest_command(command, run_dir, today, python, env), env))
     if "deepdive" in command.tasks and digest_json.exists():
-        steps.append(_run_step("Generate keyword deep dives", ["./scripts/generate_deepdives.sh", command.mode], env))
+        steps.append(_run_step("Generate keyword deep dives", _deepdive_command(command, digest_json, run_dir, python, env), env))
     elif "deepdive" in command.tasks:
         steps.append({"label": "Generate keyword deep dives", "returncode": 2, "note": f"missing {digest_json}"})
     if "weekly" in command.tasks:
-        steps.append(_run_step("Generate weekly summary", ["./scripts/generate_weekly_summary.sh"], env))
+        steps.append(_run_step("Generate weekly summary", _weekly_command(today, python, env), env))
 
     if _bool_env("EMAIL_COMMAND_GIT_PUSH", True):
         steps.append(_git_commit_and_push(run_id))
@@ -227,6 +233,82 @@ def _run_step(label: str, command: list[str], env: dict[str, str]) -> dict[str, 
     print(f"==> {label}: {' '.join(command)}")
     result = subprocess.run(command, env=env)
     return {"label": label, "returncode": result.returncode}
+
+
+def _python_executable(env: dict[str, str]) -> str:
+    if env.get("AUTOMATION_PYTHON"):
+        return env["AUTOMATION_PYTHON"]
+    if env.get("PYTHON_BIN"):
+        return env["PYTHON_BIN"]
+    if Path(".venv/bin/python").exists():
+        return ".venv/bin/python"
+    return sys.executable
+
+
+def _digest_command(
+    command: PaperCommand,
+    run_dir: Path,
+    issue_date: str,
+    python: str,
+    env: dict[str, str],
+) -> list[str]:
+    return [
+        python,
+        "-m",
+        "daily_gnss_slam_digest",
+        "--output-dir",
+        str(run_dir),
+        "--limit",
+        str(command.digest_limit or _optional_int(env.get("DIGEST_LIMIT")) or 5),
+        "--days-back",
+        str(command.days_back or _optional_int(env.get("DIGEST_DAYS_BACK")) or 180),
+        "--publish-mode",
+        command.mode,
+        "--issue-date",
+        issue_date,
+        "--keywords",
+        command.keywords,
+    ]
+
+
+def _deepdive_command(
+    command: PaperCommand,
+    digest_json: Path,
+    run_dir: Path,
+    python: str,
+    env: dict[str, str],
+) -> list[str]:
+    return [
+        python,
+        "-m",
+        "daily_gnss_slam_digest.deepdive",
+        "--input-json",
+        str(digest_json),
+        "--output-dir",
+        str(run_dir / "deepdives"),
+        "--limit",
+        str(command.deepdive_limit or _optional_int(env.get("DEEPDIVE_LIMIT")) or 3),
+        "--figures",
+        str(_optional_int(env.get("DEEPDIVE_FIGURES")) or 2),
+        "--publish-mode",
+        command.mode,
+    ]
+
+
+def _weekly_command(issue_date: str, python: str, env: dict[str, str]) -> list[str]:
+    return [
+        python,
+        "-m",
+        "daily_gnss_slam_digest.weekly",
+        "--input-dir",
+        env.get("DIGEST_OUTPUT_DIR", "outputs"),
+        "--output-dir",
+        env.get("WEEKLY_OUTPUT_DIR", "outputs/weekly"),
+        "--end-date",
+        issue_date,
+        "--days",
+        env.get("WEEKLY_SUMMARY_DAYS", "7"),
+    ]
 
 
 def _newest_message_ids(message_ids: list[bytes], max_messages: int) -> list[bytes]:

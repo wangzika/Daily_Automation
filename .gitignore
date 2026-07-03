@@ -8,7 +8,7 @@ dist/
 *.egg-info/
 work/
 outputs/logs/
-outputs/deepdives/**/paper.pdf
-outputs/deepdives/**/raw_images/
-outputs/deepdives/**/rendered_pages/
-outputs/deepdives/**/.cache/
+outputs/**/paper.pdf
+outputs/**/raw_images/
+outputs/**/rendered_pages/
+outputs/**/.cache/
