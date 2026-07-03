@@ -15,7 +15,14 @@ from typing import Any
 
 from PIL import Image, ImageChops
 
-from .notify import describe_notification_result, notify_draft_created, notify_publish_issue
+from .notify import (
+    NotificationResult,
+    describe_notification_result,
+    notify_automation_summary,
+    notify_publish_issue,
+    step_notifications_suppressed,
+    wechat_backend_url,
+)
 from .wechat import WeChatConfig, WeChatPublisher, WeChatPublisherError
 
 
@@ -45,6 +52,7 @@ def main(argv: list[str] | None = None) -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     created: list[Path] = []
     draft_ids: list[str] = []
+    draft_email_items: list[dict[str, Any]] = []
     cover_media_ids: list[str] = []
     publish_results: list[dict[str, Any]] = []
     publish_failed = False
@@ -113,23 +121,16 @@ def main(argv: list[str] | None = None) -> int:
                 thumb_media_id=cover_media_id,
             )
             draft_ids.append(media_id)
-            print(f"Created WeChat deep-dive draft media_id: {media_id}")
-            extra_lines = ()
-            if args.publish_mode == "publish" and publish_blocked_reason:
-                extra_lines = (f"正式发布已跳过：{publish_blocked_reason}",)
-            print(
-                describe_notification_result(
-                    notify_draft_created(
-                        article_type="单篇论文解读",
-                        title=title,
-                        media_id=media_id,
-                        publish_mode=args.publish_mode,
-                        local_paths=(html_path, md_path),
-                        source_url=paper.get("url"),
-                        extra_lines=extra_lines,
-                    )
-                )
+            draft_email_items.append(
+                {
+                    "title": title,
+                    "media_id": media_id,
+                    "source_url": paper.get("url"),
+                    "html_path": html_path,
+                    "md_path": md_path,
+                }
             )
+            print(f"Created WeChat deep-dive draft media_id: {media_id}")
             if args.publish_mode == "publish":
                 if publish_blocked_reason:
                     publish_results.append(
@@ -189,9 +190,75 @@ def main(argv: list[str] | None = None) -> int:
         encoding="utf-8",
     )
     print(f"Wrote manifest: {manifest}")
+    if draft_email_items:
+        print(
+            describe_notification_result(
+                _notify_deepdive_drafts_created(
+                    drafts=draft_email_items,
+                    publish_mode=args.publish_mode,
+                    manifest=manifest,
+                    publish_blocked_reason=publish_blocked_reason,
+                    publish_results=publish_results,
+                )
+            )
+        )
     if publish_failed:
         return 4
     return 0
+
+
+def _notify_deepdive_drafts_created(
+    *,
+    drafts: list[dict[str, Any]],
+    publish_mode: str,
+    manifest: Path,
+    publish_blocked_reason: str | None,
+    publish_results: list[dict[str, Any]],
+) -> NotificationResult:
+    if step_notifications_suppressed():
+        return NotificationResult(False, "step email notification suppressed")
+
+    lines = [
+        "公众号论文解读草稿已创建。",
+        f"数量：{len(drafts)}",
+        f"发布模式：{publish_mode}",
+        f"公众号后台草稿箱：{wechat_backend_url()}",
+        f"清单文件：{manifest.resolve()}",
+        "",
+        "草稿列表：",
+    ]
+    for index, draft in enumerate(drafts, start=1):
+        lines.extend(
+            [
+                f"{index}. {draft['title']}",
+                f"草稿 media_id：{draft['media_id']}",
+            ]
+        )
+        if draft.get("source_url"):
+            lines.append(f"原文：{draft['source_url']}")
+        lines.extend(
+            [
+                f"本地 HTML：{Path(draft['html_path']).resolve()}",
+                f"本地 Markdown：{Path(draft['md_path']).resolve()}",
+                "",
+            ]
+        )
+
+    if publish_blocked_reason:
+        lines.extend(["正式发布已跳过：", publish_blocked_reason, ""])
+    if publish_results:
+        lines.append("发布提交结果：")
+        for result in publish_results:
+            status = result.get("status", "unknown")
+            reason = result.get("reason")
+            line = f"- {result.get('media_id', '')}: {status}"
+            if reason:
+                line += f"；{reason}"
+            lines.append(line)
+        lines.append("")
+
+    lines.append("请到公众号后台草稿箱检查排版、封面和图片后再发布。")
+    return notify_automation_summary(subject=f"公众号论文解读草稿已创建｜{len(drafts)}篇", lines=lines)
 
 
 def build_deepdive_markdown(

@@ -4,7 +4,14 @@ import os
 import unittest
 from unittest.mock import patch
 
-from daily_gnss_slam_digest.notify import DEFAULT_WECHAT_DRAFT_URL, EmailConfig, wechat_backend_url
+from daily_gnss_slam_digest.notify import (
+    DEFAULT_WECHAT_DRAFT_URL,
+    EmailConfig,
+    NotificationResult,
+    notify_automation_summary,
+    notify_draft_created,
+    wechat_backend_url,
+)
 
 
 class EmailConfigTest(unittest.TestCase):
@@ -56,6 +63,28 @@ class EmailConfigTest(unittest.TestCase):
 
         with patch.dict(os.environ, {"WECHAT_BACKEND_URL": "https://example.com/drafts"}, clear=True):
             self.assertEqual(wechat_backend_url(), "https://example.com/drafts")
+
+    def test_step_notification_suppression_skips_draft_email(self) -> None:
+        with patch.dict(os.environ, {"EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES": "1"}, clear=True):
+            result = notify_draft_created(
+                article_type="单篇论文解读",
+                title="Example",
+                media_id="draft-media-id",
+                publish_mode="draft",
+            )
+
+        self.assertFalse(result.sent)
+        self.assertIn("suppressed", result.reason)
+
+    def test_step_notification_suppression_keeps_automation_summary_enabled(self) -> None:
+        with patch.dict(os.environ, {"EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES": "1"}, clear=True):
+            with patch("daily_gnss_slam_digest.notify.EmailNotifier.send") as send:
+                send.return_value = NotificationResult(True)
+
+                result = notify_automation_summary(subject="Summary", lines=("done",))
+
+        self.assertTrue(result.sent)
+        send.assert_called_once()
 
 
 if __name__ == "__main__":

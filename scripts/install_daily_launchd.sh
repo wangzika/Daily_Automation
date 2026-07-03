@@ -11,7 +11,7 @@ if [[ -f .env ]]; then
   set +a
 fi
 
-TIME_VALUE="${1:-${AUTOMATION_TIME:-08:30}}"
+TIME_VALUE="${1:-${AUTOMATION_TIME:-20:45}}"
 if [[ ! "$TIME_VALUE" =~ ^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$ ]]; then
   echo "Usage: $0 [HH:MM]" >&2
   exit 2

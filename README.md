@@ -82,7 +82,7 @@ SMTP_USE_TLS=1
 SMTP_USE_SSL=0
 ```
 
-QQ 邮箱的 `SMTP_PASSWORD` 是邮箱授权码，不是网页登录密码。脚本会在草稿创建成功后发送邮件；如果 `publish` 模式提交正式发布失败，草稿保留，也会再发一封失败提醒。
+QQ 邮箱的 `SMTP_PASSWORD` 是邮箱授权码，不是网页登录密码。单独运行草稿脚本时会在草稿创建成功后发送邮件；单篇论文解读会把本次生成的多篇草稿合并成一封汇总邮件。如果 `publish` 模式提交正式发布失败，草稿保留，也会再发一封失败提醒。
 
 邮件里会附上公众号后台草稿箱入口。这个入口可以通过 `WECHAT_BACKEND_URL` 覆盖；微信网页后台的具体草稿编辑页依赖登录态 token，脚本不会保存网页登录态。
 
@@ -158,12 +158,12 @@ PYTHONPATH=src python scripts/upload_cover_to_wechat.py outputs/wechat-cover-gns
 ./scripts/daily_automation.sh
 ```
 
-脚本带有运行锁，避免定时任务重叠执行；总结邮件会显示成功/失败、步骤耗时、公众号草稿箱、GitHub commit 和最近日志。
+脚本带有运行锁，避免定时任务重叠执行；定时总控默认只发送最后一封总结邮件，邮件会显示成功/失败、步骤耗时、公众号草稿箱、GitHub commit 和最近日志。
 
 `.env` 中可以配置：
 
 ```bash
-AUTOMATION_TIME=08:30
+AUTOMATION_TIME=20:45
 AUTOMATION_WECHAT_MODE=draft
 AUTOMATION_DEEPDIVE_MODE=draft
 AUTOMATION_LOG_TAIL_LINES=60
@@ -176,7 +176,7 @@ GIT_AUTHOR_NAME="GNSS Paper Bot"
 GIT_AUTHOR_EMAIL=your@email.com
 ```
 
-`AUTOMATION_WECHAT_MODE` 和 `AUTOMATION_DEEPDIVE_MODE` 支持 `none`、`draft`、`publish`。如果当前目录还不是 git 仓库，脚本会在 `GITHUB_REPO_URL` 存在时自动 `git init`、添加 `origin` 并推送。`.env`、日志、论文 PDF 和中间缓存不会提交；最终文章、正文图和配置代码会提交。
+`AUTOMATION_WECHAT_MODE` 和 `AUTOMATION_DEEPDIVE_MODE` 支持 `none`、`draft`、`publish`。总控脚本会自动设置 `EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES=1`，只保留最后一封总结邮件；如果想调试子步骤邮件，可以在 `.env` 里显式设为 `0`。如果当前目录还不是 git 仓库，脚本会在 `GITHUB_REPO_URL` 存在时自动 `git init`、添加 `origin` 并推送。`.env`、日志、论文 PDF 和中间缓存不会提交；最终文章、正文图和配置代码会提交。
 
 单独生成本周热点汇总：
 
@@ -189,7 +189,7 @@ GIT_AUTHOR_EMAIL=your@email.com
 在 macOS 上安装每日定时任务：
 
 ```bash
-./scripts/install_daily_launchd.sh 08:30
+./scripts/install_daily_launchd.sh 20:45
 ```
 
 手动触发一次已安装的定时任务：

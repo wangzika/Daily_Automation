@@ -145,6 +145,9 @@ def notify_draft_created(
     source_url: str | None = None,
     extra_lines: Iterable[str] = (),
 ) -> NotificationResult:
+    if step_notifications_suppressed():
+        return NotificationResult(False, "step email notification suppressed")
+
     lines = [
         "公众号草稿已创建。",
         f"类型：{article_type}",
@@ -170,6 +173,9 @@ def notify_publish_issue(
     media_id: str,
     reason: str,
 ) -> NotificationResult:
+    if step_notifications_suppressed():
+        return NotificationResult(False, "step email notification suppressed")
+
     body = "\n".join(
         [
             "公众号正式发布没有成功，但草稿已经保留。",
@@ -197,6 +203,10 @@ def describe_notification_result(result: NotificationResult) -> str:
 
 def wechat_backend_url() -> str:
     return _first_env("WECHAT_BACKEND_URL", "WECHAT_DRAFT_BACKEND_URL") or DEFAULT_WECHAT_DRAFT_URL
+
+
+def step_notifications_suppressed() -> bool:
+    return _bool_env("EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES", False)
 
 
 def main(argv: list[str] | None = None) -> int:
