@@ -148,18 +148,21 @@ def notify_draft_created(
     if step_notifications_suppressed():
         return NotificationResult(False, "step email notification suppressed")
 
+    output_dirs = tuple(dict.fromkeys(str(path.resolve().parent) for path in local_paths))
     lines = [
-        "公众号草稿已创建。",
-        f"类型：{article_type}",
-        f"标题：{title}",
-        f"草稿 media_id：{media_id}",
-        f"发布模式：{publish_mode}",
-        f"公众号后台草稿箱：{wechat_backend_url()}",
+        "公众号草稿：已创建",
+        "",
+        "【关键信息】",
+        f"- 类型：{article_type}",
+        f"- 标题：{title}",
+        f"- media_id：{media_id}",
+        f"- 模式：{publish_mode}",
+        f"- 草稿箱：{wechat_backend_url()}",
     ]
     if source_url:
-        lines.append(f"原文/来源：{source_url}")
-    for path in local_paths:
-        lines.append(f"本地文件：{path.resolve()}")
+        lines.append(f"- 来源：{source_url}")
+    for output_dir in output_dirs:
+        lines.append(f"- 本地输出：{output_dir}")
     lines.extend(extra_lines)
     lines.append("")
     lines.append("请到公众号后台草稿箱检查排版、封面和图片后再发布。")

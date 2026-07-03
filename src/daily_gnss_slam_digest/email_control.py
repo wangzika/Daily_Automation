@@ -245,23 +245,24 @@ def _git_commit_and_push(run_id: str) -> dict[str, object]:
 
 
 def _send_command_summary(command: PaperCommand, result: dict[str, object]):
+    success = int(result["status"]) == 0
     lines = [
-        "邮件论文指令执行完成。" if result["status"] == 0 else "邮件论文指令执行失败。",
-        f"发件人：{command.source_sender}",
-        f"主题：{command.source_subject}",
-        f"关键词：{command.keywords}",
-        f"任务：{', '.join(command.tasks)}",
-        f"模式：{command.mode}",
-        f"输出目录：{Path(str(result['run_dir'])).resolve()}",
-        f"Digest JSON：{Path(str(result['digest_json'])).resolve()}",
+        f"邮件论文指令：{'完成' if success else '失败'}",
         "",
-        "步骤：",
+        "【关键信息】",
+        f"- 关键词：{command.keywords}",
+        f"- 任务：{', '.join(command.tasks)}",
+        f"- 模式：{command.mode}",
+        f"- 输出目录：{Path(str(result['run_dir'])).resolve()}",
+        f"- Digest JSON：{Path(str(result['digest_json'])).resolve()}",
+        "",
+        "【步骤】",
     ]
     for step in result["steps"]:  # type: ignore[index]
         note = f"；{step['note']}" if step.get("note") else ""
-        lines.append(f"- {step['label']}: exit {step['returncode']}{note}")
+        lines.append(f"- {step['label']}：exit {step['returncode']}{note}")
     return notify_automation_summary(
-        subject=f"邮件论文指令{'完成' if result['status'] == 0 else '失败'}｜{command.keywords[:30]}",
+        subject=f"邮件论文指令{'完成' if success else '失败'}｜{command.keywords[:30]}",
         lines=lines,
     )
 

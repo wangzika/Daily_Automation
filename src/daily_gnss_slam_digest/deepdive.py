@@ -219,35 +219,28 @@ def _notify_deepdive_drafts_created(
         return NotificationResult(False, "step email notification suppressed")
 
     lines = [
-        "公众号论文解读草稿已创建。",
-        f"数量：{len(drafts)}",
-        f"发布模式：{publish_mode}",
-        f"公众号后台草稿箱：{wechat_backend_url()}",
-        f"清单文件：{manifest.resolve()}",
+        "论文解读草稿：已创建",
         "",
-        "草稿列表：",
+        "【关键信息】",
+        f"- 数量：{len(drafts)} 篇",
+        f"- 模式：{publish_mode}",
+        f"- 公众号草稿箱：{wechat_backend_url()}",
+        f"- 输出清单：{manifest.resolve()}",
+        "",
+        "【草稿】",
     ]
     for index, draft in enumerate(drafts, start=1):
         lines.extend(
             [
                 f"{index}. {draft['title']}",
-                f"草稿 media_id：{draft['media_id']}",
-            ]
-        )
-        if draft.get("source_url"):
-            lines.append(f"原文：{draft['source_url']}")
-        lines.extend(
-            [
-                f"本地 HTML：{Path(draft['html_path']).resolve()}",
-                f"本地 Markdown：{Path(draft['md_path']).resolve()}",
-                "",
+                f"   media_id：{draft['media_id']}",
             ]
         )
 
     if publish_blocked_reason:
-        lines.extend(["正式发布已跳过：", publish_blocked_reason, ""])
+        lines.extend(["", "【发布提醒】", f"- 正式发布已跳过：{publish_blocked_reason}"])
     if publish_results:
-        lines.append("发布提交结果：")
+        lines.extend(["", "【发布结果】"])
         for result in publish_results:
             status = result.get("status", "unknown")
             reason = result.get("reason")
@@ -255,9 +248,8 @@ def _notify_deepdive_drafts_created(
             if reason:
                 line += f"；{reason}"
             lines.append(line)
-        lines.append("")
 
-    lines.append("请到公众号后台草稿箱检查排版、封面和图片后再发布。")
+    lines.extend(["", "请到公众号后台草稿箱检查排版、封面和图片后再发布。"])
     return notify_automation_summary(subject=f"公众号论文解读草稿已创建｜{len(drafts)}篇", lines=lines)
 
 

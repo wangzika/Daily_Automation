@@ -282,30 +282,34 @@ else
 fi
 
 {
-  echo "每日 GNSS/SLAM 自动化${SUMMARY_STATUS_TEXT}。"
-  echo "日期：$RUN_DATE"
-  echo "结果码：$STATUS"
-  echo "公众号后台草稿箱：${WECHAT_BACKEND_URL:-https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_list&type=10&action=list&lang=zh_CN}"
-  echo "本地日志：$PROJECT_DIR/$LOG_FILE"
-  echo "每日推荐 JSON：$PROJECT_DIR/$DIGEST_JSON"
-  echo "$GITHUB_STATUS"
+  echo "每日自动化：$SUMMARY_STATUS_TEXT"
+  echo
+  echo "【关键信息】"
+  echo "- 日期：$RUN_DATE"
+  echo "- 状态码：$STATUS"
+  echo "- 公众号草稿箱：${WECHAT_BACKEND_URL:-https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_list&type=10&action=list&lang=zh_CN}"
   if [[ -n "$GITHUB_REPO_WEB_URL" ]]; then
-    echo "GitHub 仓库：$GITHUB_REPO_WEB_URL"
+    echo "- GitHub 仓库：$GITHUB_REPO_WEB_URL"
   fi
   if [[ -n "$GITHUB_COMMIT_URL" ]]; then
-    echo "GitHub commit：$GITHUB_COMMIT_URL"
+    echo "- GitHub commit：$GITHUB_COMMIT_URL"
+  else
+    echo "- GitHub：$GITHUB_STATUS"
   fi
+  echo "- 本地日志：$PROJECT_DIR/$LOG_FILE"
   if [[ ${#WARNINGS[@]} -gt 0 ]]; then
     echo
-    echo "提醒："
-    printf '%s\n' "${WARNINGS[@]}"
+    echo "【提醒】"
+    printf -- '- %s\n' "${WARNINGS[@]}"
   fi
   echo
-  echo "步骤："
-  printf '%s\n' "${STEP_LINES[@]}"
-  echo
-  echo "最近日志："
-  tail -n "${AUTOMATION_LOG_TAIL_LINES:-60}" "$LOG_FILE"
+  echo "【步骤】"
+  printf -- '- %s\n' "${STEP_LINES[@]}"
+  if [[ $STATUS -ne 0 ]]; then
+    echo
+    echo "【失败日志摘录】"
+    tail -n "${AUTOMATION_ERROR_LOG_TAIL_LINES:-20}" "$LOG_FILE"
+  fi
 } > "$SUMMARY_FILE"
 
 "$PYTHON" -m daily_gnss_slam_digest.notify \
