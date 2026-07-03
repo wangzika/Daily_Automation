@@ -165,13 +165,13 @@ PYTHONPATH=src python scripts/upload_cover_to_wechat.py outputs/wechat-cover-gns
 `.env` 中可以配置：
 
 ```bash
-AUTOMATION_TIME=20:45
+AUTOMATION_TIME=09:00
 AUTOMATION_PYTHON=
 AUTOMATION_WECHAT_MODE=draft
 AUTOMATION_DEEPDIVE_MODE=draft
 AUTOMATION_LOG_TAIL_LINES=60
 WEEKLY_SUMMARY_ENABLED=1
-WEEKLY_SUMMARY_DAY=5
+WEEKLY_SUMMARY_DAY=7
 WEEKLY_SUMMARY_DAYS=7
 GITHUB_REPO_URL=git@github.com:your-name/your-repo.git
 GITHUB_BRANCH=master
@@ -194,7 +194,7 @@ GIT_AUTHOR_EMAIL=your@email.com
 在 macOS 上安装每日定时任务：
 
 ```bash
-./scripts/install_daily_launchd.sh 20:45
+./scripts/install_daily_launchd.sh 09:00
 ```
 
 手动触发一次已安装的定时任务：

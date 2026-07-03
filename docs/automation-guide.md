@@ -85,7 +85,7 @@ AUTOMATION_DEEPDIVE_MODE=draft
 安装命令是：
 
 ```bash
-./scripts/install_daily_launchd.sh 20:45
+./scripts/install_daily_launchd.sh 09:00
 ```
 
 它会生成或更新这个文件：
@@ -100,19 +100,19 @@ AUTOMATION_DEEPDIVE_MODE=draft
 <key>StartCalendarInterval</key>
 <dict>
   <key>Hour</key>
-  <integer>20</integer>
+  <integer>9</integer>
   <key>Minute</key>
-  <integer>45</integer>
+  <integer>0</integer>
 </dict>
 ```
 
-到每天 `20:45` 时，macOS 会自动执行：
+到每天 `09:00` 时，macOS 会自动执行：
 
 ```bash
 <项目目录>/scripts/daily_automation.sh
 ```
 
-当前项目默认时间是每天晚上 `20:45`。
+当前项目默认时间是每天 `09:00`。
 
 ## 5. 周报什么时候生成和提醒
 
@@ -121,22 +121,22 @@ AUTOMATION_DEEPDIVE_MODE=draft
 当前配置是：
 
 ```bash
-AUTOMATION_TIME=20:45
+AUTOMATION_TIME=09:00
 AUTOMATION_PYTHON=/Users/wangzhibo/miniconda3/bin/python
 WEEKLY_SUMMARY_ENABLED=1
-WEEKLY_SUMMARY_DAY=5
+WEEKLY_SUMMARY_DAY=7
 WEEKLY_SUMMARY_DAYS=7
 ```
 
 含义是：
 
-- 每天晚上 `20:45` 运行一次总控脚本。
+- 每天 `09:00` 运行一次总控脚本。
 - `AUTOMATION_PYTHON` 指定 launchd 使用的 Python，避免系统 Python 缺少 Pillow 等依赖。
 - 如果当天是 `WEEKLY_SUMMARY_DAY` 指定的星期，就额外生成周报。
-- `WEEKLY_SUMMARY_DAY=5` 表示周五。
+- `WEEKLY_SUMMARY_DAY=7` 表示周日。
 - `WEEKLY_SUMMARY_DAYS=7` 表示汇总最近 7 天的日报候选论文。
 
-所以当前周报会在每周五晚上 `20:45` 这次自动化中生成，并在最后那封“每日 GNSS/SLAM 自动化总结邮件”里体现运行结果。周报文件会写入：
+所以当前周报会在每周日 `09:00` 这次自动化中生成，并在最后那封“每日 GNSS/SLAM 自动化总结邮件”里体现运行结果。周报文件会写入：
 
 ```text
 outputs/weekly/
@@ -154,10 +154,10 @@ outputs/weekly/
 | `6` | 周六 |
 | `7` | 周日 |
 
-如果想改成周日晚上生成周报：
+如果想改成周五生成周报：
 
 ```bash
-WEEKLY_SUMMARY_DAY=7
+WEEKLY_SUMMARY_DAY=5
 ```
 
 如果想关闭周报：
@@ -461,7 +461,7 @@ AUTOMATION_DEEPDIVE_MODE=publish
 
 ```text
 Installed launchd job: com.codex.daily-gnss-slam-digest
-Schedule: daily at 20:45
+Schedule: daily at 09:00
 ```
 
 也可以手动触发一次：
