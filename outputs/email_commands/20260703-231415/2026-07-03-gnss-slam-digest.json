@@ -1,0 +1,135 @@
+[
+  {
+    "title": "GNSS Jamming Detection with Automatic Gain Control (AGC) and Carrier-to-Noise Ratio Density (CNO) Observables from a COTS receiver",
+    "authors": [
+      "Syed Ali Kazim",
+      "Anas Darwich",
+      "Juliette Marais"
+    ],
+    "url": "http://arxiv.org/abs/2602.12688v1",
+    "pdf_url": "https://arxiv.org/pdf/2602.12688v1",
+    "published": "2026-02-13T07:43:35+00:00",
+    "updated": "2026-02-13T07:43:35+00:00",
+    "categories": [
+      "eess.SP"
+    ],
+    "primary_category": "eess.SP",
+    "arxiv_id": "2602.12688",
+    "comment": null,
+    "journal_ref": "7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany",
+    "doi": null,
+    "citation_count": null,
+    "influential_citation_count": null,
+    "venue": null,
+    "code_url": null,
+    "score": 67.54,
+    "topic_scores": {
+      "邮件指定关键词": 9.0,
+      "GNSS 欺骗与干扰检测": 52.0
+    },
+    "matched_terms": [
+      "gnss jamming",
+      "gnss",
+      "gps",
+      "spoofing",
+      "jamming",
+      "interference",
+      "integrity",
+      "detection",
+      "receiver"
+    ],
+    "quality_score": 0.0,
+    "quality_signals": {
+      "venue": "7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany"
+    },
+    "reason": "主题贴合 邮件指定关键词、GNSS 欺骗与干扰检测，关键词集中在 gnss jamming、gnss、gps、spoofing、jamming、interference、integrity、detection。质量信号：venue 7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany，适合作为今日跟踪论文。"
+  },
+  {
+    "title": "GenAI for Energy-Efficient and Interference-Aware Compressed Sensing of GNSS Signals on a Google Edge TPU",
+    "authors": [
+      "Thorben Wegner",
+      "Lucas Heublein",
+      "Tobias Feigl",
+      "Felix Ott",
+      "Christopher Mutschler",
+      "Alexander Rügamer"
+    ],
+    "url": "http://arxiv.org/abs/2605.14839v1",
+    "pdf_url": "https://arxiv.org/pdf/2605.14839v1",
+    "published": "2026-05-14T13:43:55+00:00",
+    "updated": "2026-05-14T13:43:55+00:00",
+    "categories": [
+      "cs.LG",
+      "eess.SP"
+    ],
+    "primary_category": "cs.LG",
+    "arxiv_id": "2605.14839",
+    "comment": "12 pages",
+    "journal_ref": "IEEE/ION Position, Location and Navigation Symposium (PLANS), Salt Lake City, UT, May 2025",
+    "doi": "10.1109/PLANS61210.2025.11028177",
+    "citation_count": null,
+    "influential_citation_count": null,
+    "venue": null,
+    "code_url": null,
+    "score": 63.45,
+    "topic_scores": {
+      "邮件指定关键词": 9.0,
+      "GNSS 欺骗与干扰检测": 36.0
+    },
+    "matched_terms": [
+      "gnss jamming",
+      "gnss",
+      "spoofing",
+      "jamming",
+      "interference",
+      "receiver"
+    ],
+    "quality_score": 6.5,
+    "quality_signals": {
+      "venue": "IEEE/ION Position, Location and Navigation Symposium (PLANS), Salt Lake City, UT",
+      "venue_bonus": 6.5
+    },
+    "reason": "主题贴合 邮件指定关键词、GNSS 欺骗与干扰检测，关键词集中在 gnss jamming、gnss、spoofing、jamming、interference、receiver。质量信号：venue IEEE/ION Position, Location and Navigation Symposium (PLANS), Salt Lake City, UT，适合作为今日跟踪论文。"
+  },
+  {
+    "title": "Quantum Kernels for Audio Deepfake Detection Using Spectrogram Patch Features",
+    "authors": [
+      "Lisan Al Amin",
+      "Rakib Hossain",
+      "Mahbubul Islam",
+      "Faisal Quader",
+      "Thanh Thi Nguyen"
+    ],
+    "url": "http://arxiv.org/abs/2605.06035v1",
+    "pdf_url": "https://arxiv.org/pdf/2605.06035v1",
+    "published": "2026-05-07T11:26:01+00:00",
+    "updated": "2026-05-07T11:26:01+00:00",
+    "categories": [
+      "cs.SD",
+      "cs.AI"
+    ],
+    "primary_category": "cs.SD",
+    "arxiv_id": "2605.06035",
+    "comment": null,
+    "journal_ref": null,
+    "doi": null,
+    "citation_count": null,
+    "influential_citation_count": null,
+    "venue": null,
+    "code_url": null,
+    "score": 39.17,
+    "topic_scores": {
+      "邮件指定关键词": 9.0,
+      "GNSS 欺骗与干扰检测": 19.0
+    },
+    "matched_terms": [
+      "spoofing detection",
+      "spoofing",
+      "detection",
+      "receiver"
+    ],
+    "quality_score": 0.0,
+    "quality_signals": {},
+    "reason": "主题贴合 邮件指定关键词、GNSS 欺骗与干扰检测，关键词集中在 spoofing detection、spoofing、detection、receiver。质量信号以主题相关和新近度为主，适合作为今日跟踪论文。"
+  }
+]
