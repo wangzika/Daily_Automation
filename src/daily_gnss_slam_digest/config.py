@@ -102,7 +102,7 @@ def topic_from_keywords(keywords: tuple[str, ...]) -> TopicProfile:
             weights[keyword] = 9.0 if " " in keyword or "-" in keyword else 6.0
     return TopicProfile(
         name="custom_keywords",
-        cn_name="邮件指定关键词",
+        cn_name="自定义研究主题",
         query=arxiv_query_from_keywords(keywords),
         keywords=weights,
     )

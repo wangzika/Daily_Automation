@@ -42,7 +42,7 @@ class KeywordCommandTest(unittest.TestCase):
         )
 
         self.assertEqual(ranked[0].paper.title, "Neural Implicit SLAM for Large-Scale Mapping")
-        self.assertIn("邮件指定关键词", ranked[0].topic_scores)
+        self.assertIn("自定义研究主题", ranked[0].topic_scores)
 
     def test_email_message_parses_to_command(self) -> None:
         message = EmailMessage()
@@ -68,6 +68,8 @@ class KeywordCommandTest(unittest.TestCase):
             allowed_senders=("reader@qq.com",),
             subject_keyword="论文指令",
             max_messages=5,
+            recent_days=7,
+            state_path=Path("outputs/email_commands/processed_commands.json"),
             mark_seen=True,
             default_mode="draft",
             default_tasks=("digest", "deepdive"),
@@ -82,6 +84,78 @@ class KeywordCommandTest(unittest.TestCase):
         self.assertEqual(command.mode, "draft")
         self.assertEqual(command.digest_limit, 4)
         self.assertEqual(command.deepdive_limit, 2)
+
+    def test_summary_only_task_skips_deepdive(self) -> None:
+        message = EmailMessage()
+        message["From"] = "reader@qq.com"
+        message["Subject"] = "论文指令：只要总结"
+        message.set_content(
+            "\n".join(
+                [
+                    "关键词：GNSS spoofing detection",
+                    "任务：总结",
+                    "模式：draft",
+                    "数量：3",
+                ]
+            )
+        )
+        config = EmailCommandConfig(
+            imap_host="imap.qq.com",
+            imap_port=993,
+            username="reader@qq.com",
+            password="auth",
+            folder="INBOX",
+            allowed_senders=("reader@qq.com",),
+            subject_keyword="论文指令",
+            max_messages=5,
+            recent_days=7,
+            state_path=Path("outputs/email_commands/processed_commands.json"),
+            mark_seen=True,
+            default_mode="draft",
+            default_tasks=("digest", "deepdive"),
+        )
+
+        command = command_from_message(message, config)
+
+        self.assertIsNotNone(command)
+        assert command is not None
+        self.assertEqual(command.tasks, ("digest",))
+
+    def test_zero_deepdive_limit_skips_deepdive(self) -> None:
+        message = EmailMessage()
+        message["From"] = "reader@qq.com"
+        message["Subject"] = "论文指令：不生成解读"
+        message.set_content(
+            "\n".join(
+                [
+                    "关键词：GNSS spoofing detection",
+                    "任务：digest, deepdive",
+                    "解读数量：0",
+                ]
+            )
+        )
+        config = EmailCommandConfig(
+            imap_host="imap.qq.com",
+            imap_port=993,
+            username="reader@qq.com",
+            password="auth",
+            folder="INBOX",
+            allowed_senders=("reader@qq.com",),
+            subject_keyword="论文指令",
+            max_messages=5,
+            recent_days=7,
+            state_path=Path("outputs/email_commands/processed_commands.json"),
+            mark_seen=True,
+            default_mode="draft",
+            default_tasks=("digest", "deepdive"),
+        )
+
+        command = command_from_message(message, config)
+
+        self.assertIsNotNone(command)
+        assert command is not None
+        self.assertEqual(command.tasks, ("digest",))
+        self.assertEqual(command.deepdive_limit, 0)
 
     def test_newest_unread_messages_are_checked_first(self) -> None:
         ids = [b"1", b"2", b"3", b"4", b"5", b"6"]

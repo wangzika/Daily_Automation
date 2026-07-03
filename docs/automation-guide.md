@@ -350,17 +350,61 @@ outputs/email_commands/<运行时间>/
 
 并在执行完成后发一封总结邮件，列出关键词、执行步骤、输出目录和结果码。
 
+如果只想生成“论文推荐/总结”，不要生成单篇论文解读，可以这样写：
+
+```text
+主题：论文指令：只生成总结
+
+关键词：GNSS spoofing detection, C/N0, AGC
+任务：总结
+模式：draft
+数量：5
+```
+
+也可以保留任务字段不变，但把解读数量设为 0：
+
+```text
+关键词：GNSS spoofing detection, C/N0, AGC
+任务：digest, deepdive
+解读数量：0
+```
+
 ### 10.3 支持的任务写法
 
 `任务` 可以用英文或中文：
 
 | 写法 | 等价任务 |
 | --- | --- |
-| `digest`、`daily`、`日报`、`推荐` | 生成关键词推荐文章 |
+| `digest`、`daily`、`summary`、`日报`、`推荐`、`总结`、`论文总结`、`只生成总结` | 生成关键词推荐文章 |
 | `deepdive`、`paper`、`解读`、`论文解读` | 生成单篇论文解读 |
 | `weekly`、`week`、`周报` | 生成周报 |
 
 如果只写 `任务：deepdive`，系统会自动先跑 `digest`，因为论文解读需要先有推荐列表 JSON。
+
+### 10.4 邮件扫描范围
+
+邮件指令脚本不再只看未读邮件。它会同时检查：
+
+- 未读邮件；
+- 最近 `EMAIL_COMMAND_RECENT_DAYS` 天内的邮件，默认 7 天；
+- 最新 `EMAIL_COMMAND_MAX_MESSAGES` 封候选邮件，默认 100 封。
+
+脚本会把已经执行过的邮件指令指纹写入：
+
+```text
+outputs/email_commands/processed_commands.json
+```
+
+这样即使你打开过邮件、邮件变成已读，最近的新指令也不会被漏掉；同一封邮件也不会每 5 分钟重复执行。
+
+如果你明确想重放一封最近的已读旧指令，可以手动加 `--force-recent`：
+
+```bash
+./scripts/process_email_commands.sh --dry-run --force-recent
+./scripts/process_email_commands.sh --force-recent
+```
+
+第一条只预览，第二条才会真正生成。定时任务不要加这个参数，否则旧指令可能被重复执行。
 
 ## 11. 输出文件和日志
 

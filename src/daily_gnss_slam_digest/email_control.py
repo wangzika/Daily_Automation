@@ -2,17 +2,19 @@ from __future__ import annotations
 
 import argparse
 import email
+import hashlib
 import html
 import imaplib
+import json
 import os
 import re
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from email.header import decode_header
 from email.message import Message
-from email.utils import parseaddr
+from email.utils import parseaddr, parsedate_to_datetime
 from pathlib import Path
 from typing import Iterable
 
@@ -24,8 +26,22 @@ TASK_ALIASES = {
     "digest": "digest",
     "daily": "digest",
     "recommend": "digest",
+    "summary": "digest",
+    "summarize": "digest",
     "日报": "digest",
     "推荐": "digest",
+    "总结": "digest",
+    "论文总结": "digest",
+    "只总结": "digest",
+    "仅总结": "digest",
+    "只生成总结": "digest",
+    "只生成日报": "digest",
+    "只要总结": "digest",
+    "只要日报": "digest",
+    "不解读": "digest",
+    "不要解读": "digest",
+    "不生成解读": "digest",
+    "不生成论文解读": "digest",
     "deepdive": "deepdive",
     "deep-dive": "deepdive",
     "paper": "deepdive",
@@ -47,6 +63,8 @@ class EmailCommandConfig:
     allowed_senders: tuple[str, ...]
     subject_keyword: str
     max_messages: int
+    recent_days: int
+    state_path: Path
     mark_seen: bool
     default_mode: str
     default_tasks: tuple[str, ...]
@@ -67,7 +85,11 @@ class EmailCommandConfig:
             folder=_first_env("EMAIL_COMMAND_FOLDER", "IMAP_FOLDER") or "INBOX",
             allowed_senders=tuple(address.lower() for address in allowed),
             subject_keyword=_first_env("EMAIL_COMMAND_SUBJECT_KEYWORD") or "论文指令",
-            max_messages=_int_env("EMAIL_COMMAND_MAX_MESSAGES", 5),
+            max_messages=_int_env("EMAIL_COMMAND_MAX_MESSAGES", 100),
+            recent_days=_int_env("EMAIL_COMMAND_RECENT_DAYS", 7),
+            state_path=Path(
+                _first_env("EMAIL_COMMAND_STATE_PATH") or "outputs/email_commands/processed_commands.json"
+            ),
             mark_seen=_bool_env("EMAIL_COMMAND_MARK_SEEN", True),
             default_mode=_first_env("EMAIL_COMMAND_DEFAULT_MODE") or "draft",
             default_tasks=_normalize_tasks(_first_env("EMAIL_COMMAND_DEFAULT_TASKS") or "digest,deepdive"),
@@ -101,6 +123,11 @@ class PaperCommand:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Process unread email commands for paper generation.")
     parser.add_argument("--dry-run", action="store_true", help="Parse commands without running generation scripts.")
+    parser.add_argument(
+        "--force-recent",
+        action="store_true",
+        help="Allow recent read command emails even if they are older than the latest output run.",
+    )
     args = parser.parse_args(argv)
 
     if not _bool_env("EMAIL_COMMAND_ENABLED", False):
@@ -113,22 +140,37 @@ def main(argv: list[str] | None = None) -> int:
         print("Email command setup failed: missing " + ", ".join(missing), file=sys.stderr)
         return 2
 
-    processed = process_unread_commands(config, dry_run=args.dry_run)
+    processed = process_unread_commands(config, dry_run=args.dry_run, force_recent=args.force_recent)
     print(f"Processed email commands: {processed}")
     return 0
 
 
-def process_unread_commands(config: EmailCommandConfig, *, dry_run: bool = False) -> int:
+def process_unread_commands(
+    config: EmailCommandConfig,
+    *,
+    dry_run: bool = False,
+    force_recent: bool = False,
+) -> int:
     processed = 0
+    matched = 0
+    skipped_processed = 0
+    skipped_legacy_read = 0
+    processed_fingerprints = _load_processed_fingerprints(config.state_path)
+    latest_run_at = _latest_command_run_at()
     with imaplib.IMAP4_SSL(config.imap_host, config.imap_port) as imap:
         imap.login(config.username, config.password)
         status, _ = imap.select(config.folder)
         if status != "OK":
             raise RuntimeError(f"Could not select IMAP folder: {config.folder}")
-        status, data = imap.search(None, "UNSEEN")
-        if status != "OK":
-            raise RuntimeError("Could not search unread email commands")
-        message_ids = _newest_message_ids(data[0].split(), config.max_messages)
+        unread_ids = _search_message_ids(imap, "UNSEEN")
+        recent_ids = _search_message_ids(imap, "SINCE", _imap_since_date(config.recent_days))
+        unread_id_set = set(unread_ids)
+        message_ids = _newest_message_ids(_merge_message_ids(unread_ids, recent_ids), config.max_messages)
+        if dry_run:
+            print(
+                f"Scanned candidate messages: {len(message_ids)} "
+                f"(unread: {len(unread_ids)}, recent: {len(recent_ids)})"
+            )
         for message_id in message_ids:
             status, payload = imap.fetch(message_id, "(BODY.PEEK[])")
             if status != "OK" or not payload or not isinstance(payload[0], tuple):
@@ -137,14 +179,30 @@ def process_unread_commands(config: EmailCommandConfig, *, dry_run: bool = False
             command = command_from_message(message, config)
             if command is None:
                 continue
+            matched += 1
+            fingerprint = _message_fingerprint(message)
+            if fingerprint in processed_fingerprints:
+                skipped_processed += 1
+                continue
+            if not force_recent and message_id not in unread_id_set and _is_legacy_read_command(message, latest_run_at):
+                skipped_legacy_read += 1
+                continue
             processed += 1
             if dry_run:
                 print(f"Dry run command: {command}")
                 continue
             result = execute_command(command)
             print(describe_notification_result(_send_command_summary(command, result)))
+            processed_fingerprints.add(fingerprint)
+            _save_processed_fingerprints(config.state_path, processed_fingerprints)
             if config.mark_seen:
                 imap.store(message_id, "+FLAGS", "\\Seen")
+    if dry_run:
+        print(
+            "Matched command emails: "
+            f"{matched}; skipped already processed: {skipped_processed}; "
+            f"skipped old read: {skipped_legacy_read}"
+        )
     return processed
 
 
@@ -169,6 +227,9 @@ def command_from_message(message: Message, config: EmailCommandConfig) -> PaperC
 
     tasks_value = fields.get("tasks") or fields.get("task") or fields.get("任务") or fields.get("内容") or ""
     tasks = _normalize_tasks(tasks_value) if tasks_value else config.default_tasks
+    deepdive_limit = _optional_int(fields.get("deepdive_limit") or fields.get("解读数量"))
+    if deepdive_limit == 0 or _wants_no_deepdive(fields, text):
+        tasks = _without_task(tasks, "deepdive") or ("digest",)
     if "deepdive" in tasks and "digest" not in tasks:
         tasks = ("digest", *tasks)
 
@@ -177,7 +238,7 @@ def command_from_message(message: Message, config: EmailCommandConfig) -> PaperC
         tasks=tasks,
         mode=mode,
         digest_limit=_optional_int(fields.get("limit") or fields.get("数量")),
-        deepdive_limit=_optional_int(fields.get("deepdive_limit") or fields.get("解读数量")),
+        deepdive_limit=deepdive_limit,
         days_back=_optional_int(fields.get("days_back") or fields.get("检索天数")),
         source_subject=subject,
         source_sender=sender,
@@ -259,9 +320,9 @@ def _digest_command(
         "--output-dir",
         str(run_dir),
         "--limit",
-        str(command.digest_limit or _optional_int(env.get("DIGEST_LIMIT")) or 5),
+        str(_command_int(command.digest_limit, env.get("DIGEST_LIMIT"), 5)),
         "--days-back",
-        str(command.days_back or _optional_int(env.get("DIGEST_DAYS_BACK")) or 180),
+        str(_command_int(command.days_back, env.get("DIGEST_DAYS_BACK"), 180)),
         "--publish-mode",
         command.mode,
         "--issue-date",
@@ -287,9 +348,9 @@ def _deepdive_command(
         "--output-dir",
         str(run_dir / "deepdives"),
         "--limit",
-        str(command.deepdive_limit or _optional_int(env.get("DEEPDIVE_LIMIT")) or 3),
+        str(_command_int(command.deepdive_limit, env.get("DEEPDIVE_LIMIT"), 3)),
         "--figures",
-        str(_optional_int(env.get("DEEPDIVE_FIGURES")) or 2),
+        str(_command_int(None, env.get("DEEPDIVE_FIGURES"), 2)),
         "--publish-mode",
         command.mode,
     ]
@@ -315,6 +376,102 @@ def _newest_message_ids(message_ids: list[bytes], max_messages: int) -> list[byt
     if max_messages <= 0:
         return list(reversed(message_ids))
     return list(reversed(message_ids[-max_messages:]))
+
+
+def _search_message_ids(imap: imaplib.IMAP4_SSL, *criteria: str) -> list[bytes]:
+    status, data = imap.search(None, *criteria)
+    if status != "OK":
+        raise RuntimeError(f"Could not search email commands: {' '.join(criteria)}")
+    return data[0].split() if data and data[0] else []
+
+
+def _merge_message_ids(*groups: Iterable[bytes]) -> list[bytes]:
+    unique: dict[bytes, None] = {}
+    for group in groups:
+        for message_id in group:
+            unique[message_id] = None
+    return sorted(unique, key=_message_id_number)
+
+
+def _message_id_number(message_id: bytes) -> int:
+    try:
+        return int(message_id)
+    except ValueError:
+        return 0
+
+
+def _imap_since_date(days: int) -> str:
+    since = date.today() - timedelta(days=max(days, 0))
+    months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    return f"{since.day:02d}-{months[since.month - 1]}-{since.year}"
+
+
+def _load_processed_fingerprints(path: Path) -> set[str]:
+    if not path.exists():
+        return set()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    values = data.get("processed", []) if isinstance(data, dict) else []
+    return {str(value) for value in values}
+
+
+def _save_processed_fingerprints(path: Path, fingerprints: set[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    recent = sorted(fingerprints)[-500:]
+    path.write_text(json.dumps({"processed": recent}, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _message_fingerprint(message: Message) -> str:
+    message_id = str(message.get("Message-ID", "")).strip()
+    if message_id:
+        return f"message-id:{message_id}"
+    sender = parseaddr(str(message.get("From", "")))[1].lower()
+    subject = _decode_header(str(message.get("Subject", "")))
+    date_header = str(message.get("Date", ""))
+    text = _message_text(message)
+    digest = hashlib.sha256(f"{sender}\n{subject}\n{date_header}\n{text}".encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"
+
+
+def _latest_command_run_at() -> datetime | None:
+    root = Path("outputs/email_commands")
+    if not root.exists():
+        return None
+    latest: datetime | None = None
+    for path in root.iterdir():
+        if not path.is_dir():
+            continue
+        try:
+            value = datetime.strptime(path.name, "%Y%m%d-%H%M%S").astimezone()
+        except ValueError:
+            continue
+        if latest is None or value > latest:
+            latest = value
+    return latest
+
+
+def _is_legacy_read_command(message: Message, latest_run_at: datetime | None) -> bool:
+    if latest_run_at is None:
+        return False
+    message_at = _message_datetime(message)
+    if message_at is None:
+        return False
+    return message_at <= latest_run_at
+
+
+def _message_datetime(message: Message) -> datetime | None:
+    value = str(message.get("Date", "")).strip()
+    if not value:
+        return None
+    try:
+        parsed = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        return parsed.astimezone()
+    return parsed.astimezone()
 
 
 def _git_commit_and_push(run_id: str) -> dict[str, object]:
@@ -371,6 +528,37 @@ def _parse_fields(text: str) -> dict[str, str]:
     return fields
 
 
+def _wants_no_deepdive(fields: dict[str, str], text: str) -> bool:
+    for key in ("deepdive", "deep_dive", "论文解读", "生成解读", "解读"):
+        if _is_false_value(fields.get(key)):
+            return True
+    compact = re.sub(r"\s+", "", text.lower())
+    phrases = (
+        "不生成论文解读",
+        "不要论文解读",
+        "不做论文解读",
+        "不生成解读",
+        "不要解读",
+        "不解读",
+        "只生成总结",
+        "仅生成总结",
+        "只要总结",
+        "只生成日报",
+        "只要日报",
+    )
+    return any(phrase in compact for phrase in phrases)
+
+
+def _is_false_value(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"0", "false", "no", "off", "否", "不", "不要", "不生成", "不需要"}
+
+
+def _without_task(tasks: tuple[str, ...], task: str) -> tuple[str, ...]:
+    return tuple(item for item in tasks if item != task)
+
+
 def _normalize_tasks(value: str) -> tuple[str, ...]:
     tasks: list[str] = []
     for part in re.split(r"[,;，；、\s]+", value.lower()):
@@ -380,6 +568,13 @@ def _normalize_tasks(value: str) -> tuple[str, ...]:
         if task in VALID_TASKS and task not in tasks:
             tasks.append(task)
     return tuple(tasks or ("digest", "deepdive"))
+
+
+def _command_int(command_value: int | None, env_value: str | None, default: int) -> int:
+    if command_value is not None:
+        return command_value
+    parsed = _optional_int(env_value)
+    return parsed if parsed is not None else default
 
 
 def _message_text(message: Message) -> str:
