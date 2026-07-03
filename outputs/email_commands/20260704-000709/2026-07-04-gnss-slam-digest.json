@@ -1,0 +1,195 @@
+[
+  {
+    "title": "EllipseLIO: Adaptive LiDAR Inertial Odometry with an Ellipsoid Representation",
+    "authors": [
+      "Rowan Border",
+      "Margarita Chli"
+    ],
+    "url": "http://arxiv.org/abs/2605.21150v1",
+    "pdf_url": "https://arxiv.org/pdf/2605.21150v1",
+    "published": "2026-05-20T13:24:58+00:00",
+    "updated": "2026-05-20T13:24:58+00:00",
+    "categories": [
+      "cs.RO"
+    ],
+    "primary_category": "cs.RO",
+    "arxiv_id": "2605.21150",
+    "comment": "8 pages, 6 figures, 2 tables",
+    "journal_ref": null,
+    "doi": null,
+    "citation_count": 0,
+    "influential_citation_count": 0,
+    "venue": null,
+    "code_url": null,
+    "score": 58.17,
+    "topic_scores": {
+      "自定义研究主题": 15.0,
+      "多模态/多传感器融合": 10.0,
+      "SLAM 与鲁棒里程计": 15.0
+    },
+    "matched_terms": [
+      "lidar inertial odometry",
+      "lio",
+      "lidar",
+      "inertial",
+      "odometry",
+      "robust"
+    ],
+    "quality_score": 3.0,
+    "quality_signals": {
+      "citation_count": 0,
+      "influential_citation_count": 0,
+      "code_signal": true
+    },
+    "reason": "主题贴合 自定义研究主题、多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 lidar inertial odometry、lio、lidar、inertial、odometry、robust。质量信号：引用 0、有代码线索，适合作为今日跟踪论文。"
+  },
+  {
+    "title": "Ultra-Fusion: A Resilient Tightly-Coupled Multi-Sensor Fusion SLAM Framework under Sensor Degradation and Spatiotemporal Perturbation for Intelligent Transportation Systems",
+    "authors": [
+      "Yihong Tian",
+      "Junjie Zhang",
+      "Liuyang Li",
+      "Deteng Zhang",
+      "Yunfei Zuo",
+      "Jie Yin"
+    ],
+    "url": "http://arxiv.org/abs/2606.21223v1",
+    "pdf_url": "https://arxiv.org/pdf/2606.21223v1",
+    "published": "2026-06-19T08:40:04+00:00",
+    "updated": "2026-06-19T08:40:04+00:00",
+    "categories": [
+      "cs.RO"
+    ],
+    "primary_category": "cs.RO",
+    "arxiv_id": "2606.21223",
+    "comment": "19 pages",
+    "journal_ref": null,
+    "doi": null,
+    "citation_count": null,
+    "influential_citation_count": null,
+    "venue": null,
+    "code_url": null,
+    "score": 89.6,
+    "topic_scores": {
+      "自定义研究主题": 6.0,
+      "多模态/多传感器融合": 31.0,
+      "SLAM 与鲁棒里程计": 27.0
+    },
+    "matched_terms": [
+      "lio",
+      "fusion",
+      "multi-sensor",
+      "lidar",
+      "imu",
+      "gnss",
+      "slam",
+      "localization",
+      "vio",
+      "degeneracy"
+    ],
+    "quality_score": 5.5,
+    "quality_signals": {
+      "code_signal": true,
+      "dataset_signal": true
+    },
+    "reason": "主题贴合 自定义研究主题、多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 lio、fusion、multi-sensor、lidar、imu、gnss、slam、localization。质量信号：有代码线索、有数据集/benchmark 线索，适合作为今日跟踪论文。"
+  },
+  {
+    "title": "FUSE: A Framework for Unified State Estimation in Vehicular and Robotic SLAM Systems",
+    "authors": [
+      "Wei Wu",
+      "Honglin Chen",
+      "Wenhan Cao",
+      "Yao Lyu",
+      "Shaobing Xu",
+      "Kun Jiang",
+      "Jiangtao Li",
+      "Tao Zhang",
+      "Lei Guo",
+      "Shengbo Eben Li"
+    ],
+    "url": "http://arxiv.org/abs/2605.18047v3",
+    "pdf_url": "https://arxiv.org/pdf/2605.18047v3",
+    "published": "2026-05-18T08:36:04+00:00",
+    "updated": "2026-05-21T07:55:42+00:00",
+    "categories": [
+      "cs.RO"
+    ],
+    "primary_category": "cs.RO",
+    "arxiv_id": "2605.18047",
+    "comment": null,
+    "journal_ref": null,
+    "doi": null,
+    "citation_count": null,
+    "influential_citation_count": null,
+    "venue": null,
+    "code_url": null,
+    "score": 62.89,
+    "topic_scores": {
+      "自定义研究主题": 6.0,
+      "多模态/多传感器融合": 20.0,
+      "SLAM 与鲁棒里程计": 22.0
+    },
+    "matched_terms": [
+      "lio",
+      "lidar",
+      "inertial",
+      "imu",
+      "tightly coupled",
+      "slam",
+      "loop",
+      "degeneracy"
+    ],
+    "quality_score": 0.0,
+    "quality_signals": {},
+    "reason": "主题贴合 自定义研究主题、多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 lio、lidar、inertial、imu、tightly coupled、slam、loop、degeneracy。质量信号以主题相关和新近度为主，适合作为今日跟踪论文。"
+  },
+  {
+    "title": "FAR-LIO: Enabling High-Speed Autonomy through Fast, Accurate, and Robust LiDAR-Inertial Odometry",
+    "authors": [
+      "Maximilian Leitenstern",
+      "Marcel Weinmann",
+      "Patrick Haft",
+      "Tobias Lasser",
+      "Dominik Kulmer",
+      "Markus Lienkamp"
+    ],
+    "url": "http://arxiv.org/abs/2606.26010v1",
+    "pdf_url": "https://arxiv.org/pdf/2606.26010v1",
+    "published": "2026-06-24T16:30:51+00:00",
+    "updated": "2026-06-24T16:30:51+00:00",
+    "categories": [
+      "cs.RO"
+    ],
+    "primary_category": "cs.RO",
+    "arxiv_id": "2606.26010",
+    "comment": "8 pages, accepted for publication at IROS2026 (IEEE/RSJ International Conference on Intelligent Robots and Systems 2026)",
+    "journal_ref": null,
+    "doi": null,
+    "citation_count": null,
+    "influential_citation_count": null,
+    "venue": null,
+    "code_url": null,
+    "score": 71.28,
+    "topic_scores": {
+      "自定义研究主题": 6.0,
+      "多模态/多传感器融合": 19.0,
+      "SLAM 与鲁棒里程计": 19.0
+    },
+    "matched_terms": [
+      "lio",
+      "lidar",
+      "inertial",
+      "imu",
+      "kalman",
+      "odometry",
+      "loop",
+      "robust"
+    ],
+    "quality_score": 6.0,
+    "quality_signals": {
+      "code_url": "https://github.com/TUMFTM/FAR-LIO"
+    },
+    "reason": "主题贴合 自定义研究主题、多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 lio、lidar、inertial、imu、kalman、odometry、loop、robust。质量信号：代码开源，适合作为今日跟踪论文。"
+  }
+]
