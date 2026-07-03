@@ -4,7 +4,7 @@ import unittest
 from email.message import EmailMessage
 
 from daily_gnss_slam_digest.config import arxiv_query_from_keywords, parse_keyword_text, topic_from_keywords
-from daily_gnss_slam_digest.email_control import EmailCommandConfig, command_from_message
+from daily_gnss_slam_digest.email_control import EmailCommandConfig, _newest_message_ids, command_from_message
 from daily_gnss_slam_digest.models import Paper
 from daily_gnss_slam_digest.recommender import recommend
 
@@ -76,6 +76,11 @@ class KeywordCommandTest(unittest.TestCase):
         self.assertEqual(command.mode, "draft")
         self.assertEqual(command.digest_limit, 4)
         self.assertEqual(command.deepdive_limit, 2)
+
+    def test_newest_unread_messages_are_checked_first(self) -> None:
+        ids = [b"1", b"2", b"3", b"4", b"5", b"6"]
+
+        self.assertEqual(_newest_message_ids(ids, 3), [b"6", b"5", b"4"])
 
 
 def _paper(title: str, abstract: str) -> Paper:

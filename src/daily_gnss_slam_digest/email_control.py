@@ -128,7 +128,7 @@ def process_unread_commands(config: EmailCommandConfig, *, dry_run: bool = False
         status, data = imap.search(None, "UNSEEN")
         if status != "OK":
             raise RuntimeError("Could not search unread email commands")
-        message_ids = data[0].split()[: config.max_messages]
+        message_ids = _newest_message_ids(data[0].split(), config.max_messages)
         for message_id in message_ids:
             status, payload = imap.fetch(message_id, "(BODY.PEEK[])")
             if status != "OK" or not payload or not isinstance(payload[0], tuple):
@@ -227,6 +227,12 @@ def _run_step(label: str, command: list[str], env: dict[str, str]) -> dict[str, 
     print(f"==> {label}: {' '.join(command)}")
     result = subprocess.run(command, env=env)
     return {"label": label, "returncode": result.returncode}
+
+
+def _newest_message_ids(message_ids: list[bytes], max_messages: int) -> list[bytes]:
+    if max_messages <= 0:
+        return list(reversed(message_ids))
+    return list(reversed(message_ids[-max_messages:]))
 
 
 def _git_commit_and_push(run_id: str) -> dict[str, object]:
