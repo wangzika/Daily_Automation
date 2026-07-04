@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from .arxiv_client import ArxivClient
 from .assets import ensure_article_assets
@@ -18,6 +20,7 @@ from .config import (
     rotating_topic_for_date,
     topic_from_keywords,
 )
+from .models import Paper, RecommendedPaper
 from .notify import describe_notification_result, notify_draft_created, notify_publish_issue
 from .recommender import recommend
 from .sample_data import SAMPLE_PAPERS
@@ -51,13 +54,20 @@ def main(argv: list[str] | None = None) -> int:
         scoring_topics = TOPICS
         focus_topic = "GNSS/融合/SLAM 综合方向"
 
-    if args.sample:
+    if args.from_json:
+        recommendations = _load_recommendations_from_json(args.from_json)
+        if not recommendations:
+            print(f"No recommendations found in JSON: {args.from_json}", file=sys.stderr)
+            return 2
+        print(f"Using existing digest JSON: {args.from_json}")
+        papers = []
+    elif args.sample:
         papers = SAMPLE_PAPERS
     else:
         client = ArxivClient(retries=args.arxiv_retries, retry_delay_seconds=args.arxiv_retry_delay)
         papers = client.search_many(search_queries, max_results_per_query=args.per_topic)
 
-    if args.semantic_scholar == "on" and not args.sample:
+    if args.semantic_scholar == "on" and not args.sample and not args.from_json:
         print(f"Enriching up to {args.quality_enrich_limit} papers with Semantic Scholar metadata.")
         papers = enrich_papers(
             papers,
@@ -66,7 +76,8 @@ def main(argv: list[str] | None = None) -> int:
             delay_seconds=args.semantic_scholar_delay,
         )
 
-    recommendations = recommend(papers, limit=args.limit, days_back=args.days_back, topics=scoring_topics)
+    if not args.from_json:
+        recommendations = recommend(papers, limit=args.limit, days_back=args.days_back, topics=scoring_topics)
     if not recommendations and fallback_queries and not args.sample:
         print("No strong match for today's rotating topic. Falling back to all rotating hot topics.", file=sys.stderr)
         papers = client.search_many(fallback_queries, max_results_per_query=max(args.per_topic // 2, 10))
@@ -186,6 +197,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--sample", action="store_true", help="Use bundled sample papers instead of querying arXiv.")
     parser.add_argument(
+        "--from-json",
+        type=Path,
+        help="Re-render and optionally publish an existing digest JSON without querying arXiv.",
+    )
+    parser.add_argument(
         "--semantic-scholar",
         choices=("off", "on"),
         default=os.getenv("SEMANTIC_SCHOLAR_ENRICH", "off"),
@@ -210,3 +226,74 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Use a weekday rotating hot topic when no custom keywords are provided.",
     )
     return parser.parse_args(argv)
+
+
+def _load_recommendations_from_json(path: Path) -> list[RecommendedPaper]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, list):
+        return []
+    recommendations: list[RecommendedPaper] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        paper = Paper(
+            title=str(item.get("title") or "Untitled"),
+            authors=tuple(str(author) for author in _list_value(item.get("authors"))),
+            abstract=str(item.get("abstract") or ""),
+            url=str(item.get("url") or ""),
+            pdf_url=_optional_str(item.get("pdf_url")),
+            published=_datetime_value(item.get("published")),
+            updated=_datetime_value(item.get("updated") or item.get("published")),
+            categories=tuple(str(category) for category in _list_value(item.get("categories"))),
+            primary_category=_optional_str(item.get("primary_category")),
+            arxiv_id=_optional_str(item.get("arxiv_id")),
+            comment=_optional_str(item.get("comment")),
+            journal_ref=_optional_str(item.get("journal_ref")),
+            doi=_optional_str(item.get("doi")),
+            citation_count=_optional_int(item.get("citation_count")),
+            influential_citation_count=_optional_int(item.get("influential_citation_count")),
+            venue=_optional_str(item.get("venue")),
+            code_url=_optional_str(item.get("code_url")),
+        )
+        recommendations.append(
+            RecommendedPaper(
+                paper=paper,
+                score=float(item.get("score") or 0.0),
+                topic_scores={str(key): float(value) for key, value in _dict_value(item.get("topic_scores")).items()},
+                matched_terms=tuple(str(term) for term in _list_value(item.get("matched_terms"))),
+                quality_score=float(item.get("quality_score") or 0.0),
+                quality_signals=_dict_value(item.get("quality_signals")),
+                reason=str(item.get("reason") or ""),
+            )
+        )
+    return recommendations
+
+
+def _list_value(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
+def _dict_value(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _optional_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value)
+    return text or None
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _datetime_value(value: Any) -> datetime:
+    if isinstance(value, str) and value:
+        return datetime.fromisoformat(value)
+    return datetime.now(timezone.utc)
