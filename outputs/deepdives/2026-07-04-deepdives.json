@@ -1,18 +1,10 @@
 {
   "articles": [
-    "outputs/deepdives/01-2602.12688/article.html",
-    "outputs/deepdives/02-2606.27811/article.html",
-    "outputs/deepdives/03-2606.30166/article.html"
+    "outputs/deepdives/01-2606.20215/article.html",
+    "outputs/deepdives/02-2606.24210/article.html",
+    "outputs/deepdives/03-2606.23210/article.html"
   ],
-  "draft_media_ids": [
-    "OzDw82ZGuV7j2GWA35lmhhBe66uxMTfHKT8rZ291OdkvClnDBom9z7iV6Srz3NlS",
-    "OzDw82ZGuV7j2GWA35lmhklNBxcIeVJo29dTJl4h2MRHWJvnfyavUzkCMjxA1EmQ",
-    "OzDw82ZGuV7j2GWA35lmhlpBJhSpo977iJLs-nQrZ8-4DB1JBR53vMQY8a5sgdrC"
-  ],
-  "cover_media_ids": [
-    "OzDw82ZGuV7j2GWA35lmhjkngVlC2eeanx9--Fqa0ds6pTuTqanBNY4bjwNS6JX9",
-    "OzDw82ZGuV7j2GWA35lmhgzyfuAzL5jiN9FKj4Kd3J_NLrmyriwZgcFwgO_KnXHu",
-    "OzDw82ZGuV7j2GWA35lmhuTAI_r9rIIJGgD7oWr6Lb1GTSE1u9JScNIy3x5s-E0j"
-  ],
+  "draft_media_ids": [],
+  "cover_media_ids": [],
   "publish_results": []
 }
