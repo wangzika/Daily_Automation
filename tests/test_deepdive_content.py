@@ -8,6 +8,7 @@ from daily_gnss_slam_digest.deepdive import (
     PaperReading,
     _display_figure_caption,
     _extract_base64_image,
+    _figure_reading,
     _image_variants,
     build_deepdive_html,
     build_deepdive_markdown,
@@ -91,7 +92,30 @@ class DeepDiveContentTest(unittest.TestCase):
 
     def test_figure_caption_removes_duplicate_number_prefixes(self) -> None:
         caption = "图 1 . Fig. 1: System Overview. The proposed framework."
-        self.assertEqual(_display_figure_caption(caption, 1), "主图：System Overview")
+        self.assertEqual(_display_figure_caption(caption, 1), "主图：系统总览")
+
+    def test_figure_reading_translates_caption_without_keyword_template(self) -> None:
+        paper = {
+            "title": "SA-LIVO: Subspace-Aware LiDAR-Inertial-Visual Odometry",
+            "authors": ["A. Reader"],
+            "abstract": "SA-LIVO fuses LiDAR, camera, and IMU measurements for robust odometry and mapping.",
+            "matched_terms": ["slam", "lidar", "imu"],
+        }
+        reading = PaperReading(
+            abstract=str(paper["abstract"]),
+            introduction="Robust odometry needs stable fusion in diverse environments.",
+            method="The system uses subspace-aware fusion and unified state update.",
+            experiments="Representative mapping results are shown across diverse environments.",
+            conclusion="The method improves mapping robustness.",
+            captions=("Fig. 1. System overview of SA-LIVO.",),
+        )
+        figure = DeepDiveFigure(Path("figure-1.jpg"), reading.captions[0])
+
+        text = _figure_reading(paper, reading, figure, 1)
+
+        self.assertIn("原文图注可以译为：“SA-LIVO 系统总览”", text)
+        self.assertNotIn("关键词是", text)
+        self.assertNotIn("输入 ->", text)
 
     def test_image_variants_support_both_modes(self) -> None:
         self.assertEqual(_image_variants("both"), ("paper", "ai"))

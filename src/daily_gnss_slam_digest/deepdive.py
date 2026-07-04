@@ -653,7 +653,7 @@ def _display_figure_caption(caption: str, display_index: int, source: str = "pap
     if source == "ai":
         body = _short_figure_caption_body(caption)
         return f"主图：{body}" if body else "主图：方法流程概念图"
-    caption = _caption_without_figure_number(caption)
+    caption = _translate_figure_caption(caption)
     match = re.match(r"^(?:Fig(?:ure)?\.?)\s*(\d+)\s*[.:]?\s*(.*)$", caption, re.IGNORECASE)
     prefix = "主图" if display_index == 1 else "论文图"
     if match:
@@ -674,6 +674,69 @@ def _caption_without_figure_number(caption: str) -> str:
     caption = re.sub(r"^\s*图\s*\d+\s*[.．:：、-]*\s*", "", caption)
     caption = re.sub(r"^\s*(?:Fig(?:ure)?\.?)\s*\d+\s*[.:：、-]*\s*", "", caption, flags=re.IGNORECASE)
     return caption.strip()
+
+
+def _translate_figure_caption(caption: str) -> str:
+    caption = _caption_without_figure_number(_clean_figure_caption(caption))
+    if not caption:
+        return ""
+    if not _has_real_figure_caption(caption):
+        return "从 PDF 提取的论文原图"
+
+    lowered = caption.lower().rstrip(" .。")
+    exact = {
+        "system overview": "系统总览",
+        "system overview of sa-livo": "SA-LIVO 系统总览",
+        "representative mapping results of sa-livo across diverse environments": "SA-LIVO 在多种环境中的代表性建图结果",
+        "spoofing attack setup with sdr, obu, rsu, and synthetic trajectory": "包含 SDR、OBU、RSU 和合成轨迹的欺骗攻击设置",
+        "functional block diagram of the gps l1 c/a signal simulation and transmis-": "GPS L1 C/A 信号仿真与发射的功能模块图",
+    }
+    if lowered in exact:
+        return exact[lowered]
+
+    translated = caption
+    phrase_map = (
+        (r"\bSystem Overview\b", "系统总览"),
+        (r"\bsystem overview\b", "系统总览"),
+        (r"\bRepresentative mapping results\b", "代表性建图结果"),
+        (r"\bacross diverse environments\b", "在多种环境中"),
+        (r"\bdiverse environments\b", "多种环境"),
+        (r"\bproposed framework\b", "所提出的框架"),
+        (r"\bproposed method\b", "所提出的方法"),
+        (r"\bframework\b", "框架"),
+        (r"\barchitecture\b", "架构"),
+        (r"\bpipeline\b", "流程"),
+        (r"\bworkflow\b", "工作流"),
+        (r"\bblock diagram\b", "模块图"),
+        (r"\bfunctional block diagram\b", "功能模块图"),
+        (r"\bspoofing attack setup\b", "欺骗攻击设置"),
+        (r"\bspoofing attack\b", "欺骗攻击"),
+        (r"\bsynthetic trajectory\b", "合成轨迹"),
+        (r"\bexperimental setup\b", "实验设置"),
+        (r"\bsetup\b", "设置"),
+        (r"\bmapping results\b", "建图结果"),
+        (r"\bmapping\b", "建图"),
+        (r"\blocalization\b", "定位"),
+        (r"\bodometry\b", "里程计"),
+        (r"\btrajectory\b", "轨迹"),
+        (r"\bresults\b", "结果"),
+        (r"\bevaluation\b", "评估"),
+    )
+    for pattern, replacement in phrase_map:
+        translated = re.sub(pattern, replacement, translated, flags=re.IGNORECASE)
+    translated = translated.replace("of SA-LIVO", "：SA-LIVO")
+    translated = translated.replace("SA-LIVO across", "SA-LIVO 在")
+    translated = re.sub(r"\s+", " ", translated).strip(" .。")
+    return translated
+
+
+def _has_real_figure_caption(caption: str) -> bool:
+    caption = _clean_figure_caption(caption)
+    return not (
+        caption.startswith("论文原图")
+        or caption.startswith("论文 PDF")
+        or re.match(r"^pdf\s+page\b", caption, re.IGNORECASE)
+    )
 
 
 def _short_figure_caption_body(caption: str) -> str:
@@ -1032,23 +1095,25 @@ def _section_narrative(section_text: str, profile: dict[str, str], role: str, fa
     anchor = _claim_to_plain_chinese(claim, profile, role)
     if role == "problem":
         return (
-            f"这一节先给问题定边界：主角是{profile['actor']}，压力来自{profile['problem']}。"
-            f"{anchor}。读到这里要抓住两个变量：系统相信了什么输入，以及这个输入在什么条件下会失真。"
+            f"开篇先把矛盾摆出来：{profile['actor']}原本依赖稳定输入工作，"
+            f"但现场会遇到{profile['problem']}。{anchor}。"
+            "读这一段时，不必急着记术语，先看清作者认为“危险”到底发生在哪个环节。"
         )
     if role == "method":
         return (
-            f"方法部分可以拆成三步：先确认输入数据，再看作者怎样构造{profile['method']}，"
-            f"最后看输出如何服务于{profile['engineering']}。{anchor}。"
-            "这一步要把每个模块和它消耗的观测量对上号。"
+            f"方法部分可以当作一条处理链来看：输入是什么，{profile['method']}怎样把信息组织起来，"
+            f"最后又怎样服务于{profile['engineering']}。{anchor}。"
+            "这样读会比逐个背模块名轻松，也更容易看出作者真正改动了哪里。"
         )
     if role == "experiment":
         return (
-            f"实验部分要回答“证据够不够”。这篇的证据应落在{profile['experiment']}。"
-            f"{anchor}。读表格和曲线时，把数据来源、对比对象、失败场景和指标单位放在一起看。"
+            f"实验部分重点看证据链是否完整：数据从哪里来，场景够不够真实，指标是否能说明问题。"
+            f"这篇的验证线索落在{profile['experiment']}。{anchor}。"
+            "如果图表里能同时看到成功样例和困难样例，结论就更有参考价值。"
         )
     return (
-        f"收束部分要看作者把贡献限定在哪里。对工程读者来说，关键不是记住一个新名字，"
-        f"而是判断它能否接到{profile['engineering']}。{anchor}。"
+        f"最后再看边界：作者证明了什么，哪些条件下成立，换到自己的平台是否还需要重做标定或实验。"
+        f"对工程读者来说，关键是它能否接到{profile['engineering']}。{anchor}。"
     )
 
 
@@ -1057,14 +1122,14 @@ def _source_clues(paper: dict[str, Any], reading: PaperReading) -> list[str]:
     facts = _paper_facts(paper, reading)
     terms = _paper_terms(paper, reading)
     clues = [
-        f"先圈题目里的关键词：{', '.join(terms[:8]) or _display_title(paper)}。它们把文章带到{profile['scene']}，后文要追的是{profile['problem']}。",
-        f"摘要给出的第一条线索是：{_claim_to_plain_chinese(facts.get('problem', ''), profile, 'problem')}。这决定了文章不是只看最终效果，而是在追踪问题怎样发生。",
-        f"第二条线索落在做法：{_claim_to_plain_chinese(facts.get('method', ''), profile, 'method')}。读方法时优先找输入、假设、核心运算和输出。",
+        f"题目里最值得先圈出的词是：{', '.join(terms[:8]) or _display_title(paper)}。它们把文章带到{profile['scene']}，也暗示后面要解决{profile['problem']}。",
+        f"摘要先交代问题：{_claim_to_plain_chinese(facts.get('problem', ''), profile, 'problem')}。这决定了文章的重点不是堆结果，而是解释问题为什么会发生。",
+        f"接着看做法：{_claim_to_plain_chinese(facts.get('method', ''), profile, 'method')}。方法部分优先找清楚输入、假设、核心运算和输出。",
     ]
     if reading.captions:
         caption_terms = _paper_terms_from_text(" ".join(reading.captions))[:5]
         if caption_terms:
-            clues.append(f"图注里反复出现 {', '.join(caption_terms)}，说明主图很可能承载了系统流程、实验设置或结果对比。")
+            clues.append(f"图注里反复出现 {', '.join(caption_terms)}，这些词多半对应系统流程、实验设置或结果展示，是读图时最容易抓住的线索。")
     quality = paper.get("quality_signals") or {}
     if paper.get("code_url") or quality.get("code_signal"):
         clues.append("这篇有代码或复现线索，读完方法后可以直接检查代码是否覆盖数据预处理、训练/检测和评估脚本。")
@@ -1109,45 +1174,47 @@ def _followup_questions(paper: dict[str, Any]) -> list[str]:
 def _figure_reading(paper: dict[str, Any], reading: PaperReading, figure: DeepDiveFigure, index: int) -> str:
     profile = _domain_profile(paper, reading)
     caption = figure.caption
-    caption_terms = _paper_terms_from_text(caption)
     lowered = caption.lower()
-    evidence = f"图注里的关键词是 {', '.join(caption_terms[:5])}。" if caption_terms else ""
+    translated_caption = _translate_figure_caption(caption)
+    translation = f"原文图注可以译为：“{translated_caption}”。" if _has_real_figure_caption(caption) and translated_caption else ""
     if figure.source == "ai":
         return (
-            f"这张主图是把论文的核心矛盾画成一条工程链路：左边是{profile['scene']}里的输入和扰动，"
-            f"中间是作者关注的{profile['method']}，右边落到{profile['engineering']}。"
-            "读正文时可以顺着这条链追问三件事：输入是否可靠，中间判断依据是什么，输出能否直接服务部署。"
+            f"这张主图是辅助示意，用来把论文里的{profile['problem']}和{profile['method']}放到同一张画面里。"
+            "它不替代论文原图，只负责让读者先有一个直观印象，再回到后面的原图和实验细节。"
         )
     if figure.source == "pdf_page":
         return (
-            "这张图来自论文页面截图，只适合作为定位全文结构的索引。真正读方法和实验时，"
-            f"还是要回到正文里确认{profile['method']}用到了哪些观测，以及{profile['experiment']}如何证明效果。"
+            "这是一页论文截图，适合作为全文入口。它的价值不是展示某个具体实验图，"
+            f"而是帮读者先看到论文如何引出{profile['problem']}，再进入方法和实验部分。"
         )
     if any(term in lowered for term in ("setup", "framework", "architecture", "system", "overview", "pipeline", "workflow", "flow")):
         return (
-            f"这张图适合当作全文路线图：按“输入 -> {profile['method']} -> 输出”走一遍，"
-            f"就能看清作者把创新放在观测、模型、检测还是优化环节。{evidence}"
+            f"{translation}它展示的是论文的整体组织方式：哪些传感器或观测先进来，"
+            "中间经过哪些估计、融合或更新模块，最后形成状态、地图或告警结果。"
         )
     if any(term in lowered for term in ("experiment", "evaluation", "result", "performance", "benchmark", "table")):
         return (
-            f"这张图要和实验段落一起读：先确认数据来自哪里，再看指标怎样衡量{profile['problem']}是否被缓解。"
-            f"{evidence}曲线或柱状图最有价值的地方，是能不能解释强弱场景、失败样本和对比方法之间的差异。"
+            f"{translation}这类结果图主要回答“实验是否站得住”：场景是否足够多，"
+            "指标是否能支撑作者的结论，以及失败或退化场景有没有被清楚展示。"
         )
     if any(term in lowered for term in ("map", "mapping", "trajectory", "odometry", "localization", "pose")):
         return (
-            f"这张图在展示定位或建图结果。先看轨迹连续性、地图重影、回环前后变化，再回到正文确认这些变化由哪些观测支撑。{evidence}"
+            f"{translation}它展示的是定位、里程计或建图效果。读这类图时，重点看轨迹是否连续、"
+            "地图是否有明显重影，以及不同场景下结果是否保持稳定。"
         )
     if any(term in lowered for term in ("gnss", "gps", "spoof", "jamming", "interference", "timing", "signal")):
         return (
-            f"这张图围绕信号或时间轴展开。读图时把异常输入、接收机状态和最终告警连起来，"
-            f"看作者是否把{profile['problem']}从现象拆成了可测量的变量。{evidence}"
+            f"{translation}它讲的是信号、时间或接收机状态之间的关系。把异常输入、接收机响应和最终输出连起来，"
+            "就能看出作者如何把风险变成可观测、可评估的问题。"
         )
     if index == 1:
         return (
-            f"这张主图先按数据流读：先找输入观测，再找{profile['method']}所在的位置，"
-            f"最后看它输出给{profile['engineering']}的是什么。{evidence}"
+            f"{translation}这张主图先帮读者建立整体印象：论文讨论的对象是什么，"
+            "主要模块在哪里，最后希望解决什么工程问题。"
         )
-    return f"这张图放在后面看细节：它要么补充实验对比，要么解释某个模块的内部变量。读的时候把它和{profile['experiment']}对应起来。{evidence}"
+    if not translation:
+        return "这张图没有解析到完整原文图注，可以把它当作正文细节的补充：要么解释某个模块，要么展示一个实验现象，读的时候和相邻段落一起看即可。"
+    return f"{translation}这张图更像是对正文细节的补充：要么解释某个模块，要么补充实验现象，读的时候和相邻段落一起看即可。"
 
 
 def _domain_profile(paper: dict[str, Any], reading: PaperReading) -> dict[str, str]:
