@@ -113,6 +113,10 @@ def enrich_papers(
         except SemanticScholarError as exc:
             print(f"Semantic Scholar enrichment skipped for {paper.title}: {exc}")
             enriched.append(paper)
+            if "HTTP 429" in str(exc):
+                print("Semantic Scholar enrichment rate limited; skipping remaining enrichment requests.")
+                enriched.extend(papers[index + 1 :])
+                break
             continue
         if not metadata:
             enriched.append(paper)

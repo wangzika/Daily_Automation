@@ -1,41 +1,128 @@
 [
   {
-    "title": "GNSS Jamming Detection with Automatic Gain Control (AGC) and Carrier-to-Noise Ratio Density (CNO) Observables from a COTS receiver",
+    "title": "GNSS Spoofing Threat for V2X communications",
     "authors": [
-      "Syed Ali Kazim",
-      "Anas Darwich",
-      "Juliette Marais"
+      "Adolfo P. Jimenez",
+      "Juan Arquero-Gallego",
+      "Mario P. Luna",
+      "Jose E. Naranjo",
+      "Felipe Jimenez Alonso"
     ],
-    "abstract": "",
-    "url": "http://arxiv.org/abs/2602.12688v1",
-    "pdf_url": "https://arxiv.org/pdf/2602.12688v1",
-    "published": "2026-02-13T07:43:35+00:00",
-    "updated": "2026-02-13T07:43:35+00:00",
+    "abstract": "Global Navigation Satellite Systems (GNSS) constitute a core technology for delivering crucial positioning, navigation, and timing (PNT) services in the Vehicle-to-Everything (V2X) domain, where they are indispensable for generating Cooperative Awareness Messages (CAM) that uphold network reliability and vehicular safety. Yet, GNSS signals are acutely exposed to spoofing, an advanced attack in which an adversary transmits crafted signals that replicate legitimate satellite characteristics, misleading the receiver into computing a false position. This work presents a methodology for conducting physical spoofing with inexpensive Software Defined Radio (SDR), describing a coordinate generation pipeline that employs Haversine-based distance calculations, temporal discretization to emulate constant velocity, and linear interpolation to produce high-fidelity GPS baseband signals. The proposed attack is experimentally validated on real Commsignia OnBoard Unit (OBU) and RoadSide Unit (RSU) devices using a HackRF One across three scenarios that emulate synthetic trajectories at steady speeds of 90 km/h, 145 km/h, and 200 km/h. The most significant contribution of this paper is the demonstration that V2X communications are not secured, as they are susceptible to GNSS spoofing attacks, which cause service degradation without being detected.",
+    "url": "http://arxiv.org/abs/2606.20215v1",
+    "pdf_url": "https://arxiv.org/pdf/2606.20215v1",
+    "published": "2026-06-18T13:30:04+00:00",
+    "updated": "2026-06-18T13:30:04+00:00",
     "categories": [
-      "eess.SP"
+      "cs.CR"
     ],
-    "primary_category": "eess.SP",
-    "arxiv_id": "2602.12688",
-    "comment": null,
-    "journal_ref": "7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany",
+    "primary_category": "cs.CR",
+    "arxiv_id": "2606.20215",
+    "comment": "2026 IEEE\\@. Personal use of this material is permitted. Permission from IEEE must be obtained for all other uses, in any current or future media, including reprinting/republishing this material for advertising or promotional purposes, creating new collective works, for resale or redistribution to servers or lists, or reuse of any copyrighted component of this work in other works",
+    "journal_ref": null,
     "doi": null,
     "citation_count": null,
     "influential_citation_count": null,
     "venue": null,
     "code_url": null,
-    "score": 26.01,
+    "score": 51.84,
     "topic_scores": {
-      "韧性 PNT 与 GNSS 抗欺骗抗干扰": 22.0
+      "韧性 PNT 与 GNSS 抗欺骗抗干扰": 29.0
+    },
+    "matched_terms": [
+      "pnt",
+      "gnss",
+      "gps",
+      "spoofing"
+    ],
+    "quality_score": 8.0,
+    "quality_signals": {
+      "venue": "NAVIGATION",
+      "venue_bonus": 6.0,
+      "real_world_signal": true
+    },
+    "reason": "主题贴合 韧性 PNT 与 GNSS 抗欺骗抗干扰，关键词集中在 pnt、gnss、gps、spoofing。质量信号：venue NAVIGATION、强调真实实验，适合作为今日跟踪论文。"
+  },
+  {
+    "title": "A Conditional Timing Protection Level: Holdover-Limited Undetected Time Error Under GNSS Spoofing",
+    "authors": [
+      "Chakshu Baweja"
+    ],
+    "abstract": "A GNSS timing receiver under spoofing has no nominal-geometry fault for position-domain RAIM to bound: the threat is a slow, common-mode pull of served clock time that the receiver's own time-accuracy flag need not reveal. We make three graded contributions. First, a field measurement: solving the receiver clock trajectory from raw L1 pseudoranges and broadcast ephemeris, we show a recorded over-the-air spoof from the public JammerTest 2024 campaign pulled a u-blox ZED-F9P by about 1.01 ms of served time while it reported at most 51 ns, a gap near 20,000x. Second, an impossibility: against an adversary free to choose the ramp rate, no finite unconditional bound on undetected time error exists under a single self-referential clock-aided monitor, because a ramp slow enough to keep the disciplined reference in lock-step is never alarmed while the error grows without limit, so any finite guarantee is conditional. Third, the conditional bound: the Timing Protection Level (TPL), a model-free monitor's static detectability floor plus the oscillator's coast over the detection latency, holds given detection by an independent cross-satellite consistency check a coherent spoofer does not drive in lock-step. Each term is a closed form over a primitive verified in the open Kshana simulator, so the sum is reproducible by hand. Calibrated on the recorded attack, the budget is 114 ns at one-second recovery and 458 ns at a 60-second coast, thousands of times below the 1.01 ms accepted; a clock-aided sequential test alone gives essentially no protection on this slow ramp (it alarms only near the ~1 ms capture), while the model-free monitor alarms during the ramp. We are explicit: the bound is calibrated, not field-validated; carries no integrity-risk budget; and is reported as a band at long coast. The simulator, bound, and calibration example are open source under AGPL-3.0.",
+    "url": "http://arxiv.org/abs/2606.24210v1",
+    "pdf_url": "https://arxiv.org/pdf/2606.24210v1",
+    "published": "2026-06-23T06:52:58+00:00",
+    "updated": "2026-06-23T06:52:58+00:00",
+    "categories": [
+      "eess.SP",
+      "cs.CR"
+    ],
+    "primary_category": "eess.SP",
+    "arxiv_id": "2606.24210",
+    "comment": "8 pages, 5 figures, 2 tables. Calibrated on the public JammerTest 2024 dataset (Zenodo 10.5281/zenodo.15911589). TPL primitives, CUSUM detector, and calibration example open source in the Kshana simulator (AGPL-3.0)",
+    "journal_ref": null,
+    "doi": null,
+    "citation_count": null,
+    "influential_citation_count": null,
+    "venue": null,
+    "code_url": null,
+    "score": 46.36,
+    "topic_scores": {
+      "韧性 PNT 与 GNSS 抗欺骗抗干扰": 25.0
     },
     "matched_terms": [
       "gnss",
-      "jamming",
-      "agc"
+      "spoofing",
+      "integrity"
     ],
-    "quality_score": 0.0,
+    "quality_score": 5.5,
     "quality_signals": {
-      "venue": "7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany"
+      "code_signal": true,
+      "dataset_signal": true
     },
-    "reason": "主题贴合 韧性 PNT 与 GNSS 抗欺骗抗干扰，关键词集中在 gnss、jamming、agc。质量信号：venue 7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany，适合作为今日跟踪论文。"
+    "reason": "主题贴合 韧性 PNT 与 GNSS 抗欺骗抗干扰，关键词集中在 gnss、spoofing、integrity。质量信号：有代码线索、有数据集/benchmark 线索，适合作为今日跟踪论文。"
+  },
+  {
+    "title": "Efficient Network Inference via Hardware-Aware Architecture Search, Model Pruning & Quantization",
+    "authors": [
+      "Lucas Heublein",
+      "Mark Deutel",
+      "Axel Plinge",
+      "Felix Ott"
+    ],
+    "abstract": "Embedded global navigation satellite system (GNSS) interference monitoring requires fast and memory-efficient inference to process large volumes of raw in-phase and quadrature (IQ) samples in real time. At the same time, increasingly expressive deep neural networks (DNNs) are needed for robust interference classification and characterization across diverse signal conditions. This creates a fundamental tension between predictive performance and deployability on resource-constrained hardware. In this paper, we investigate efficient network inference for GNSS interference characterization using iterative structured pruning, post-training static quantization, and hardware-aware zero-shot neural architecture search (NAS). Starting from MCUNet as a compact baseline, we analyze how model compression and automated architecture optimization affect model size, computational complexity, and memory usage while maintaining task performance. Experiments on a GNSS interference dataset, covering both classification and generalized characterization, show the benefits of combining compression and hardware-aware design for embedded deployment. Our results provide practical guidance for developing compact machine learning (ML) models for real-time GNSS interference monitoring on embedded platforms (iMXRT1062 MCU, Raspberry Pi Zero 2W, and Raspberry Pi 5).",
+    "url": "http://arxiv.org/abs/2606.23210v1",
+    "pdf_url": "https://arxiv.org/pdf/2606.23210v1",
+    "published": "2026-06-22T11:54:34+00:00",
+    "updated": "2026-06-22T11:54:34+00:00",
+    "categories": [
+      "cs.LG",
+      "cs.DC",
+      "eess.SP"
+    ],
+    "primary_category": "cs.LG",
+    "arxiv_id": "2606.23210",
+    "comment": "7 pages, 7 figures",
+    "journal_ref": null,
+    "doi": null,
+    "citation_count": null,
+    "influential_citation_count": null,
+    "venue": null,
+    "code_url": null,
+    "score": 40.18,
+    "topic_scores": {
+      "韧性 PNT 与 GNSS 抗欺骗抗干扰": 16.0
+    },
+    "matched_terms": [
+      "gnss",
+      "interference"
+    ],
+    "quality_score": 8.5,
+    "quality_signals": {
+      "venue": "NAVIGATION",
+      "venue_bonus": 6.0,
+      "dataset_signal": true
+    },
+    "reason": "主题贴合 韧性 PNT 与 GNSS 抗欺骗抗干扰，关键词集中在 gnss、interference。质量信号：venue NAVIGATION、有数据集/benchmark 线索，适合作为今日跟踪论文。"
   }
 ]

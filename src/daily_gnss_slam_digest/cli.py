@@ -20,8 +20,10 @@ from .config import (
     rotating_topic_for_date,
     topic_from_keywords,
 )
+from .crossref import CrossrefClient, CrossrefError
 from .models import Paper, RecommendedPaper
 from .notify import describe_notification_result, notify_draft_created, notify_publish_issue
+from .openalex import OpenAlexClient, OpenAlexError
 from .recommender import recommend
 from .sample_data import SAMPLE_PAPERS
 from .semantic_scholar import SemanticScholarClient, SemanticScholarError, enrich_papers
@@ -36,6 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     fallback_queries: list[str] = []
     fallback_topics = ROTATING_TOPICS
     arxiv_failed = False
+    fallback_sources = _fallback_sources(args.fallback_sources)
     if keywords:
         custom_topic = topic_from_keywords(keywords)
         search_queries = [custom_topic.query]
@@ -86,9 +89,8 @@ def main(argv: list[str] | None = None) -> int:
             arxiv_failed = True
             print(f"arXiv search failed: {exc}", file=sys.stderr)
             search_source = "fallback"
-            fallback_sources = _fallback_sources(args.fallback_sources)
             if "semantic-scholar" in fallback_sources:
-                semantic_queries = _semantic_queries_for_topics(scoring_topics, keywords)
+                semantic_queries = _fallback_queries_for_topics(scoring_topics, keywords)
                 try:
                     papers = _search_semantic_scholar(args, semantic_queries)
                     if papers:
@@ -96,6 +98,22 @@ def main(argv: list[str] | None = None) -> int:
                         print(f"Using Semantic Scholar fallback papers: {len(papers)}")
                 except SemanticScholarError as semantic_exc:
                     print(f"Semantic Scholar fallback failed: {semantic_exc}", file=sys.stderr)
+            if not papers and "openalex" in fallback_sources:
+                try:
+                    papers = _search_openalex(args, _fallback_queries_for_topics(scoring_topics, keywords))
+                    if papers:
+                        search_source = "openalex"
+                        print(f"Using OpenAlex fallback papers: {len(papers)}")
+                except OpenAlexError as openalex_exc:
+                    print(f"OpenAlex fallback failed: {openalex_exc}", file=sys.stderr)
+            if not papers and "crossref" in fallback_sources:
+                try:
+                    papers = _search_crossref(args, _fallback_queries_for_topics(scoring_topics, keywords))
+                    if papers:
+                        search_source = "crossref"
+                        print(f"Using Crossref fallback papers: {len(papers)}")
+                except CrossrefError as crossref_exc:
+                    print(f"Crossref fallback failed: {crossref_exc}", file=sys.stderr)
             if not papers and "existing-json" in fallback_sources:
                 existing_json = _digest_json_path(args.output_dir, issue_date)
                 if existing_json.exists():
@@ -125,6 +143,34 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.from_json:
         recommendations = recommend(papers, limit=args.limit, days_back=args.days_back, topics=scoring_topics)
+    if not recommendations and arxiv_failed and not args.sample and not args.from_json:
+        current_queries = _fallback_queries_for_topics(scoring_topics, keywords)
+        for source in fallback_sources:
+            if source in {search_source, "existing-json"}:
+                continue
+            try:
+                papers = _search_named_fallback(args, source, current_queries)
+            except (SemanticScholarError, OpenAlexError, CrossrefError) as exc:
+                print(f"{source} fallback failed after topic scoring: {exc}", file=sys.stderr)
+                continue
+            recommendations = recommend(papers, limit=args.limit, days_back=args.days_back, topics=scoring_topics)
+            if recommendations:
+                search_source = source
+                print(f"Using {source} fallback after topic scoring: {len(papers)}")
+                break
+        if not recommendations and "existing-json" in fallback_sources:
+            existing_json = _digest_json_path(args.output_dir, issue_date)
+            if existing_json.exists():
+                recommendations = _rerank_loaded_recommendations(
+                    _load_recommendations_from_json(existing_json),
+                    limit=args.limit,
+                    days_back=args.days_back,
+                    topics=scoring_topics,
+                    issue_date=issue_date,
+                )
+                if recommendations:
+                    print(f"Using existing digest JSON fallback after topic scoring: {existing_json}")
+                    args.from_json = existing_json
     if not recommendations and fallback_queries and not args.sample:
         print("No strong match for today's rotating topic. Falling back to all rotating hot topics.", file=sys.stderr)
         papers = []
@@ -135,12 +181,24 @@ def main(argv: list[str] | None = None) -> int:
             except ArxivClientError as exc:
                 arxiv_failed = True
                 print(f"arXiv hot-topic fallback failed: {exc}", file=sys.stderr)
-        if not papers and "semantic-scholar" in _fallback_sources(args.fallback_sources):
+        if not papers and "semantic-scholar" in fallback_sources:
             try:
-                papers = _search_semantic_scholar(args, _semantic_queries_for_topics(fallback_topics, ()))
+                papers = _search_semantic_scholar(args, _fallback_queries_for_topics(fallback_topics, ()))
                 search_source = "semantic-scholar"
             except SemanticScholarError as exc:
                 print(f"Semantic Scholar hot-topic fallback failed: {exc}", file=sys.stderr)
+        if not papers and "openalex" in fallback_sources:
+            try:
+                papers = _search_openalex(args, _fallback_queries_for_topics(fallback_topics, ()))
+                search_source = "openalex"
+            except OpenAlexError as exc:
+                print(f"OpenAlex hot-topic fallback failed: {exc}", file=sys.stderr)
+        if not papers and "crossref" in fallback_sources:
+            try:
+                papers = _search_crossref(args, _fallback_queries_for_topics(fallback_topics, ()))
+                search_source = "crossref"
+            except CrossrefError as exc:
+                print(f"Crossref hot-topic fallback failed: {exc}", file=sys.stderr)
         if args.semantic_scholar == "on" and papers and search_source != "semantic-scholar":
             papers = enrich_papers(
                 papers,
@@ -304,9 +362,33 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Maximum Semantic Scholar fallback papers per query.",
     )
     parser.add_argument(
+        "--openalex-search-limit",
+        type=int,
+        default=int(os.getenv("OPENALEX_SEARCH_LIMIT", "25")),
+        help="Maximum OpenAlex fallback papers per query.",
+    )
+    parser.add_argument(
+        "--openalex-delay",
+        type=float,
+        default=float(os.getenv("OPENALEX_DELAY_SECONDS", "1.0")),
+        help="Delay between OpenAlex fallback requests, in seconds.",
+    )
+    parser.add_argument(
+        "--crossref-search-limit",
+        type=int,
+        default=int(os.getenv("CROSSREF_SEARCH_LIMIT", "25")),
+        help="Maximum Crossref fallback papers per query.",
+    )
+    parser.add_argument(
+        "--crossref-delay",
+        type=float,
+        default=float(os.getenv("CROSSREF_DELAY_SECONDS", "1.0")),
+        help="Delay between Crossref fallback requests, in seconds.",
+    )
+    parser.add_argument(
         "--fallback-sources",
-        default=os.getenv("PAPER_FALLBACK_SOURCES", "semantic-scholar,existing-json"),
-        help="Comma separated fallback sources after arXiv failure: semantic-scholar, existing-json, or off.",
+        default=os.getenv("PAPER_FALLBACK_SOURCES", "semantic-scholar,openalex,crossref,existing-json"),
+        help="Comma separated fallback sources after arXiv failure: semantic-scholar, openalex, crossref, existing-json, or off.",
     )
     parser.add_argument(
         "--topic-rotation",
@@ -378,7 +460,35 @@ def _search_semantic_scholar(args: argparse.Namespace, queries: list[str]) -> li
     )
 
 
-def _semantic_queries_for_topics(topics: tuple[Any, ...], keywords: tuple[str, ...]) -> list[str]:
+def _search_openalex(args: argparse.Namespace, queries: list[str]) -> list[Paper]:
+    client = OpenAlexClient()
+    return client.search_many(
+        queries,
+        limit_per_query=args.openalex_search_limit,
+        delay_seconds=args.openalex_delay,
+    )
+
+
+def _search_crossref(args: argparse.Namespace, queries: list[str]) -> list[Paper]:
+    client = CrossrefClient()
+    return client.search_many(
+        queries,
+        limit_per_query=args.crossref_search_limit,
+        delay_seconds=args.crossref_delay,
+    )
+
+
+def _search_named_fallback(args: argparse.Namespace, source: str, queries: list[str]) -> list[Paper]:
+    if source == "semantic-scholar":
+        return _search_semantic_scholar(args, queries)
+    if source == "openalex":
+        return _search_openalex(args, queries)
+    if source == "crossref":
+        return _search_crossref(args, queries)
+    return []
+
+
+def _fallback_queries_for_topics(topics: tuple[Any, ...], keywords: tuple[str, ...]) -> list[str]:
     if keywords:
         return [" ".join(keywords)]
     queries: list[str] = []
@@ -395,9 +505,13 @@ def _semantic_queries_for_topics(topics: tuple[Any, ...], keywords: tuple[str, .
     return queries
 
 
+def _semantic_queries_for_topics(topics: tuple[Any, ...], keywords: tuple[str, ...]) -> list[str]:
+    return _fallback_queries_for_topics(topics, keywords)
+
+
 def _fallback_sources(value: str) -> tuple[str, ...]:
     values = parse_keyword_text(value.lower().replace("off", ""))
-    allowed = {"semantic-scholar", "existing-json"}
+    allowed = {"semantic-scholar", "openalex", "crossref", "existing-json"}
     return tuple(source for source in values if source in allowed)
 
 

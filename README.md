@@ -45,7 +45,7 @@ SEMANTIC_SCHOLAR_API_KEY=
 
 - arXiv 查询会写入 `ARXIV_CACHE_DIR`，同一天同主题重复测试会优先读缓存。
 - 遇到 arXiv `429` 或超时，会按更长间隔退避；如果有旧缓存，会用旧缓存继续生成。
-- arXiv 仍不可用时，会按 `PAPER_FALLBACK_SOURCES` 切到备用源，默认顺序是 `semantic-scholar,existing-json`。
+- arXiv 仍不可用时，会按 `PAPER_FALLBACK_SOURCES` 切到备用源，默认顺序是 `semantic-scholar,openalex,crossref,existing-json`。
 
 推荐配置：
 
@@ -54,11 +54,17 @@ DIGEST_PER_TOPIC=10
 ARXIV_MIN_DELAY_SECONDS=3.5
 ARXIV_CACHE_DIR=outputs/cache/arxiv
 ARXIV_CACHE_TTL_HOURS=26
-PAPER_FALLBACK_SOURCES=semantic-scholar,existing-json
+PAPER_FALLBACK_SOURCES=semantic-scholar,openalex,crossref,existing-json
 SEMANTIC_SCHOLAR_SEARCH_LIMIT=25
+OPENALEX_SEARCH_LIMIT=25
+OPENALEX_DELAY_SECONDS=1.0
+OPENALEX_MAILTO=
+CROSSREF_SEARCH_LIMIT=25
+CROSSREF_DELAY_SECONDS=1.0
+CROSSREF_MAILTO=
 ```
 
-`semantic-scholar` 会用 Semantic Scholar 论文搜索补论文；`existing-json` 会用当天已有 JSON 重新按主题过滤排版。这样 arXiv 临时限流时，公众号草稿仍能生成。
+`semantic-scholar`、`openalex`、`crossref` 会依次搜索公开学术索引补论文；`existing-json` 会用当天已有 JSON 重新按主题过滤排版。这样 arXiv 临时限流时，公众号草稿仍能生成。`OPENALEX_MAILTO` 和 `CROSSREF_MAILTO` 可填你的邮箱，方便进入这些 API 的 polite pool。
 
 ## 微信公众号配置
 

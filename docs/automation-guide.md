@@ -133,15 +133,25 @@ ARXIV_RETRY_DELAY_SECONDS=10.0
 ARXIV_MIN_DELAY_SECONDS=3.5
 ARXIV_CACHE_DIR=outputs/cache/arxiv
 ARXIV_CACHE_TTL_HOURS=26
-PAPER_FALLBACK_SOURCES=semantic-scholar,existing-json
+PAPER_FALLBACK_SOURCES=semantic-scholar,openalex,crossref,existing-json
 SEMANTIC_SCHOLAR_SEARCH_LIMIT=25
+OPENALEX_SEARCH_LIMIT=25
+OPENALEX_DELAY_SECONDS=1.0
+OPENALEX_MAILTO=
+CROSSREF_SEARCH_LIMIT=25
+CROSSREF_DELAY_SECONDS=1.0
+CROSSREF_MAILTO=
 ```
 
 备用源含义：
 
 - `semantic-scholar`：arXiv 不可用时，用 Semantic Scholar Graph API 搜索同主题论文。
+- `openalex`：Semantic Scholar 不可用或没有强匹配时，用 OpenAlex Works API 搜索。
+- `crossref`：继续没有结果时，用 Crossref Works API 补充 DOI/期刊会议元数据。
 - `existing-json`：如果外部接口都不可用，用当天已有日报 JSON 重新按当前主题过滤并排版。
 - `off`：关闭备用源，arXiv 失败就直接失败。
+
+`OPENALEX_MAILTO` 和 `CROSSREF_MAILTO` 可以填通知邮箱，公开 API 会更容易把请求归入礼貌访问池。
 
 ## 5. 周报什么时候生成和提醒
 
