@@ -114,6 +114,35 @@ AUTOMATION_DEEPDIVE_MODE=draft
 
 当前项目默认时间是每天 `09:00`。
 
+## 4.1 arXiv 限流和备用源
+
+自动化会优先使用 arXiv API。为了减少 `429 Too Many Requests`，日报生成现在会：
+
+1. 把原始 arXiv API 响应缓存到 `ARXIV_CACHE_DIR`。
+2. 同一主题在 `ARXIV_CACHE_TTL_HOURS` 内重复执行时直接读缓存。
+3. arXiv 超时或返回 429 时按更长间隔退避。
+4. 如果线上请求失败但本地有旧缓存，先用旧缓存继续生成。
+5. 如果 arXiv 完全不可用，按 `PAPER_FALLBACK_SOURCES` 使用备用源。
+
+推荐配置：
+
+```bash
+DIGEST_PER_TOPIC=10
+ARXIV_RETRIES=3
+ARXIV_RETRY_DELAY_SECONDS=10.0
+ARXIV_MIN_DELAY_SECONDS=3.5
+ARXIV_CACHE_DIR=outputs/cache/arxiv
+ARXIV_CACHE_TTL_HOURS=26
+PAPER_FALLBACK_SOURCES=semantic-scholar,existing-json
+SEMANTIC_SCHOLAR_SEARCH_LIMIT=25
+```
+
+备用源含义：
+
+- `semantic-scholar`：arXiv 不可用时，用 Semantic Scholar Graph API 搜索同主题论文。
+- `existing-json`：如果外部接口都不可用，用当天已有日报 JSON 重新按当前主题过滤并排版。
+- `off`：关闭备用源，arXiv 失败就直接失败。
+
 ## 5. 周报什么时候生成和提醒
 
 周报没有单独的定时器，它挂在每日自动化总控里。

@@ -7,6 +7,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import replace
+from datetime import datetime, timezone
 from typing import Any
 
 from .models import Paper
@@ -14,6 +15,10 @@ from .models import Paper
 
 SEMANTIC_SCHOLAR_GRAPH_URL = "https://api.semanticscholar.org/graph/v1/paper"
 DEFAULT_FIELDS = "citationCount,influentialCitationCount,venue,publicationVenue,url,externalIds"
+SEARCH_FIELDS = (
+    "paperId,title,abstract,authors,year,publicationDate,externalIds,url,openAccessPdf,"
+    "citationCount,influentialCitationCount,venue,publicationVenue"
+)
 
 
 class SemanticScholarError(RuntimeError):
@@ -48,6 +53,42 @@ class SemanticScholarClient:
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
                 return None
+            raise SemanticScholarError(f"Semantic Scholar API returned HTTP {exc.code}") from exc
+        except OSError as exc:
+            raise SemanticScholarError(f"Semantic Scholar API failed: {exc}") from exc
+
+    def search(self, query: str, limit: int = 25) -> list[Paper]:
+        params = {
+            "query": query,
+            "limit": str(max(min(limit, 100), 1)),
+            "fields": SEARCH_FIELDS,
+        }
+        url = f"{self.base_url}/search?{urllib.parse.urlencode(params)}"
+        data = self._get_json(url)
+        items = data.get("data")
+        if not isinstance(items, list):
+            return []
+        return [_paper_from_search_item(item) for item in items if isinstance(item, dict)]
+
+    def search_many(self, queries: list[str], limit_per_query: int = 25, delay_seconds: float = 1.0) -> list[Paper]:
+        papers_by_id: dict[str, Paper] = {}
+        for index, query in enumerate(queries):
+            if index:
+                time.sleep(max(delay_seconds, 0.0))
+            for paper in self.search(query, limit=limit_per_query):
+                key = paper.arxiv_id or paper.doi or paper.url or paper.title
+                papers_by_id.setdefault(key, paper)
+        return list(papers_by_id.values())
+
+    def _get_json(self, url: str) -> dict[str, Any]:
+        headers = {"User-Agent": "daily-gnss-slam-digest/0.1"}
+        if self.api_key:
+            headers["x-api-key"] = self.api_key
+        request = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                return _decode_json(response.read())
+        except urllib.error.HTTPError as exc:
             raise SemanticScholarError(f"Semantic Scholar API returned HTTP {exc.code}") from exc
         except OSError as exc:
             raise SemanticScholarError(f"Semantic Scholar API failed: {exc}") from exc
@@ -127,4 +168,83 @@ def _int_or_none(value: Any) -> int | None:
         return value
     if isinstance(value, float):
         return int(value)
+    return None
+
+
+def _paper_from_search_item(item: dict[str, Any]) -> Paper:
+    external_ids = item.get("externalIds") if isinstance(item.get("externalIds"), dict) else {}
+    arxiv_id = _external_id(external_ids, ("ArXiv", "arXiv"))
+    doi = _external_id(external_ids, ("DOI", "doi"))
+    published = _publication_datetime(item)
+    url = _paper_url(item, arxiv_id)
+    return Paper(
+        title=str(item.get("title") or "Untitled"),
+        authors=_authors_from_item(item),
+        abstract=str(item.get("abstract") or ""),
+        url=url,
+        pdf_url=_pdf_url(item, arxiv_id),
+        published=published,
+        updated=published,
+        categories=("semantic-scholar",),
+        primary_category="Semantic Scholar",
+        arxiv_id=arxiv_id,
+        doi=doi,
+        citation_count=_int_or_none(item.get("citationCount")),
+        influential_citation_count=_int_or_none(item.get("influentialCitationCount")),
+        venue=_venue_from_metadata(item),
+    )
+
+
+def _authors_from_item(item: dict[str, Any]) -> tuple[str, ...]:
+    authors = item.get("authors")
+    if not isinstance(authors, list):
+        return ()
+    names: list[str] = []
+    for author in authors:
+        if isinstance(author, dict) and isinstance(author.get("name"), str) and author["name"].strip():
+            names.append(author["name"].strip())
+    return tuple(names)
+
+
+def _publication_datetime(item: dict[str, Any]) -> datetime:
+    publication_date = item.get("publicationDate")
+    if isinstance(publication_date, str) and publication_date:
+        try:
+            return datetime.fromisoformat(publication_date).replace(tzinfo=timezone.utc)
+        except ValueError:
+            pass
+    year = _int_or_none(item.get("year"))
+    if year:
+        return datetime(year, 1, 1, tzinfo=timezone.utc)
+    return datetime.now(timezone.utc)
+
+
+def _paper_url(item: dict[str, Any], arxiv_id: str | None) -> str:
+    if arxiv_id:
+        return f"https://arxiv.org/abs/{arxiv_id}"
+    url = item.get("url")
+    if isinstance(url, str) and url:
+        return url
+    paper_id = item.get("paperId")
+    if isinstance(paper_id, str) and paper_id:
+        return f"https://www.semanticscholar.org/paper/{paper_id}"
+    return ""
+
+
+def _pdf_url(item: dict[str, Any], arxiv_id: str | None) -> str | None:
+    if arxiv_id:
+        return f"https://arxiv.org/pdf/{arxiv_id}"
+    open_access_pdf = item.get("openAccessPdf")
+    if isinstance(open_access_pdf, dict):
+        url = open_access_pdf.get("url")
+        if isinstance(url, str) and url:
+            return url
+    return None
+
+
+def _external_id(external_ids: dict[str, Any], keys: tuple[str, ...]) -> str | None:
+    for key in keys:
+        value = external_ids.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
     return None

@@ -39,6 +39,27 @@ SEMANTIC_SCHOLAR_API_KEY=
 
 没有 Semantic Scholar API key 也可以运行；如果接口限流或不可用，脚本会跳过外部增强，继续按本地质量信号出稿。
 
+## arXiv 限流兜底
+
+日报现在默认做三层保护：
+
+- arXiv 查询会写入 `ARXIV_CACHE_DIR`，同一天同主题重复测试会优先读缓存。
+- 遇到 arXiv `429` 或超时，会按更长间隔退避；如果有旧缓存，会用旧缓存继续生成。
+- arXiv 仍不可用时，会按 `PAPER_FALLBACK_SOURCES` 切到备用源，默认顺序是 `semantic-scholar,existing-json`。
+
+推荐配置：
+
+```bash
+DIGEST_PER_TOPIC=10
+ARXIV_MIN_DELAY_SECONDS=3.5
+ARXIV_CACHE_DIR=outputs/cache/arxiv
+ARXIV_CACHE_TTL_HOURS=26
+PAPER_FALLBACK_SOURCES=semantic-scholar,existing-json
+SEMANTIC_SCHOLAR_SEARCH_LIMIT=25
+```
+
+`semantic-scholar` 会用 Semantic Scholar 论文搜索补论文；`existing-json` 会用当天已有 JSON 重新按主题过滤排版。这样 arXiv 临时限流时，公众号草稿仍能生成。
+
 ## 微信公众号配置
 
 复制环境变量模板：

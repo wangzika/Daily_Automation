@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
 import time
 import urllib.error
 import urllib.parse
@@ -25,11 +27,18 @@ class ArxivClient:
         timeout: int = 30,
         retries: int = 3,
         retry_delay_seconds: float = 10.0,
+        min_delay_seconds: float = 3.0,
+        cache_dir: Path | None = None,
+        cache_ttl_hours: float = 26.0,
     ) -> None:
         self.user_agent = user_agent
         self.timeout = timeout
         self.retries = retries
         self.retry_delay_seconds = retry_delay_seconds
+        self.min_delay_seconds = min_delay_seconds
+        self.cache_dir = cache_dir
+        self.cache_ttl_seconds = max(cache_ttl_hours, 0.0) * 3600
+        self._last_request_at = 0.0
 
     def search(self, query: str, max_results: int = 25, start: int = 0) -> list[Paper]:
         params = {
@@ -41,7 +50,7 @@ class ArxivClient:
         }
         url = f"{ARXIV_API_URL}?{urllib.parse.urlencode(params)}"
         request = urllib.request.Request(url, headers={"User-Agent": self.user_agent})
-        payload = self._open_with_retries(request)
+        payload = self._open_with_cache(request)
 
         try:
             root = ET.fromstring(payload)
@@ -50,11 +59,32 @@ class ArxivClient:
 
         return [self._parse_entry(entry) for entry in root.findall("atom:entry", ATOM_NS)]
 
+    def _open_with_cache(self, request: urllib.request.Request) -> bytes:
+        cache_path = self._cache_path(request.full_url)
+        if cache_path and self._is_fresh_cache(cache_path):
+            print(f"arXiv cache hit: {cache_path.name}")
+            return cache_path.read_bytes()
+
+        try:
+            payload = self._open_with_retries(request)
+        except ArxivClientError:
+            if cache_path and cache_path.exists():
+                print(f"arXiv live query failed; using stale cache: {cache_path.name}")
+                return cache_path.read_bytes()
+            raise
+
+        if cache_path:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_path.write_bytes(payload)
+        return payload
+
     def _open_with_retries(self, request: urllib.request.Request) -> bytes:
         last_error: OSError | None = None
         for attempt in range(self.retries + 1):
             try:
+                self._respect_min_delay()
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                    self._last_request_at = time.monotonic()
                     return response.read()
             except urllib.error.HTTPError as exc:
                 last_error = exc
@@ -64,20 +94,47 @@ class ArxivClient:
                 last_error = exc
                 if attempt >= self.retries:
                     break
-            sleep_for = self.retry_delay_seconds * (attempt + 1)
+            sleep_for = self._retry_sleep_for(last_error, attempt)
             print(f"arXiv query failed ({last_error}); retrying in {sleep_for:.1f}s.")
             time.sleep(sleep_for)
         raise ArxivClientError(f"Failed to query arXiv: {last_error}") from last_error
 
     def search_many(self, queries: list[str], max_results_per_query: int = 25) -> list[Paper]:
         papers_by_id: dict[str, Paper] = {}
-        for index, query in enumerate(queries):
-            if index:
-                time.sleep(3)
+        for query in queries:
             for paper in self.search(query=query, max_results=max_results_per_query):
                 key = paper.arxiv_id or paper.url
                 papers_by_id.setdefault(key, paper)
         return list(papers_by_id.values())
+
+    def _respect_min_delay(self) -> None:
+        if self.min_delay_seconds <= 0 or self._last_request_at <= 0:
+            return
+        elapsed = time.monotonic() - self._last_request_at
+        if elapsed < self.min_delay_seconds:
+            time.sleep(self.min_delay_seconds - elapsed)
+
+    def _retry_sleep_for(self, error: OSError | None, attempt: int) -> float:
+        retry_after = _retry_after_seconds(error)
+        if retry_after is not None:
+            return retry_after
+        base = self.retry_delay_seconds * (2**attempt)
+        if isinstance(error, urllib.error.HTTPError) and error.code == 429:
+            return max(base, 60.0)
+        return base
+
+    def _cache_path(self, url: str) -> Path | None:
+        if not self.cache_dir:
+            return None
+        digest = hashlib.sha256(url.encode("utf-8")).hexdigest()
+        return self.cache_dir / f"{digest}.xml"
+
+    def _is_fresh_cache(self, path: Path) -> bool:
+        if not path.exists():
+            return False
+        if self.cache_ttl_seconds <= 0:
+            return True
+        return (time.time() - path.stat().st_mtime) <= self.cache_ttl_seconds
 
     def _parse_entry(self, entry: ET.Element) -> Paper:
         title = _clean_text(_required_text(entry, "atom:title"))
@@ -155,3 +212,15 @@ def _extract_arxiv_id(url: str) -> str | None:
         return None
     arxiv_id = url.rsplit(marker, 1)[-1]
     return arxiv_id.split("v", 1)[0]
+
+
+def _retry_after_seconds(error: OSError | None) -> float | None:
+    if not isinstance(error, urllib.error.HTTPError):
+        return None
+    value = error.headers.get("Retry-After")
+    if not value:
+        return None
+    try:
+        return max(float(value), 0.0)
+    except ValueError:
+        return None

@@ -8,7 +8,7 @@ from datetime import date, datetime, time, timezone
 from pathlib import Path
 from typing import Any
 
-from .arxiv_client import ArxivClient
+from .arxiv_client import ArxivClient, ArxivClientError
 from .assets import ensure_article_assets
 from .article import build_digest, build_html, build_title, write_outputs
 from .config import (
@@ -24,7 +24,7 @@ from .models import Paper, RecommendedPaper
 from .notify import describe_notification_result, notify_draft_created, notify_publish_issue
 from .recommender import recommend
 from .sample_data import SAMPLE_PAPERS
-from .semantic_scholar import SemanticScholarClient, enrich_papers
+from .semantic_scholar import SemanticScholarClient, SemanticScholarError, enrich_papers
 from .wechat import WeChatConfig, WeChatPublisher, WeChatPublisherError
 
 
@@ -35,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     focus_topic = ""
     fallback_queries: list[str] = []
     fallback_topics = ROTATING_TOPICS
+    arxiv_failed = False
     if keywords:
         custom_topic = topic_from_keywords(keywords)
         search_queries = [custom_topic.query]
@@ -77,10 +78,43 @@ def main(argv: list[str] | None = None) -> int:
     elif args.sample:
         papers = SAMPLE_PAPERS
     else:
-        client = ArxivClient(retries=args.arxiv_retries, retry_delay_seconds=args.arxiv_retry_delay)
-        papers = client.search_many(search_queries, max_results_per_query=args.per_topic)
+        papers = []
+        search_source = "arxiv"
+        try:
+            papers = _search_arxiv(args, search_queries)
+        except ArxivClientError as exc:
+            arxiv_failed = True
+            print(f"arXiv search failed: {exc}", file=sys.stderr)
+            search_source = "fallback"
+            fallback_sources = _fallback_sources(args.fallback_sources)
+            if "semantic-scholar" in fallback_sources:
+                semantic_queries = _semantic_queries_for_topics(scoring_topics, keywords)
+                try:
+                    papers = _search_semantic_scholar(args, semantic_queries)
+                    if papers:
+                        search_source = "semantic-scholar"
+                        print(f"Using Semantic Scholar fallback papers: {len(papers)}")
+                except SemanticScholarError as semantic_exc:
+                    print(f"Semantic Scholar fallback failed: {semantic_exc}", file=sys.stderr)
+            if not papers and "existing-json" in fallback_sources:
+                existing_json = _digest_json_path(args.output_dir, issue_date)
+                if existing_json.exists():
+                    loaded_recommendations = _load_recommendations_from_json(existing_json)
+                    recommendations = _rerank_loaded_recommendations(
+                        loaded_recommendations,
+                        limit=args.limit,
+                        days_back=args.days_back,
+                        topics=scoring_topics,
+                        issue_date=issue_date,
+                    )
+                    if recommendations:
+                        print(f"Using existing digest JSON fallback: {existing_json}")
+                        papers = []
+                        args.from_json = existing_json
+                    else:
+                        print(f"Existing digest JSON fallback had no topic match: {existing_json}", file=sys.stderr)
 
-    if args.semantic_scholar == "on" and not args.sample and not args.from_json:
+    if args.semantic_scholar == "on" and not args.sample and not args.from_json and papers and search_source != "semantic-scholar":
         print(f"Enriching up to {args.quality_enrich_limit} papers with Semantic Scholar metadata.")
         papers = enrich_papers(
             papers,
@@ -93,8 +127,21 @@ def main(argv: list[str] | None = None) -> int:
         recommendations = recommend(papers, limit=args.limit, days_back=args.days_back, topics=scoring_topics)
     if not recommendations and fallback_queries and not args.sample:
         print("No strong match for today's rotating topic. Falling back to all rotating hot topics.", file=sys.stderr)
-        papers = client.search_many(fallback_queries, max_results_per_query=max(args.per_topic // 2, 10))
-        if args.semantic_scholar == "on":
+        papers = []
+        if not arxiv_failed:
+            try:
+                papers = _search_arxiv(args, fallback_queries, max_results=max(args.per_topic // 2, 10))
+                search_source = "arxiv"
+            except ArxivClientError as exc:
+                arxiv_failed = True
+                print(f"arXiv hot-topic fallback failed: {exc}", file=sys.stderr)
+        if not papers and "semantic-scholar" in _fallback_sources(args.fallback_sources):
+            try:
+                papers = _search_semantic_scholar(args, _semantic_queries_for_topics(fallback_topics, ()))
+                search_source = "semantic-scholar"
+            except SemanticScholarError as exc:
+                print(f"Semantic Scholar hot-topic fallback failed: {exc}", file=sys.stderr)
+        if args.semantic_scholar == "on" and papers and search_source != "semantic-scholar":
             papers = enrich_papers(
                 papers,
                 client=SemanticScholarClient(),
@@ -194,12 +241,30 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=Path(os.getenv("DIGEST_OUTPUT_DIR", DEFAULT_OUTPUT_DIR)))
     parser.add_argument("--limit", type=int, default=int(os.getenv("DIGEST_LIMIT", "5")))
     parser.add_argument("--days-back", type=int, default=int(os.getenv("DIGEST_DAYS_BACK", "180")))
-    parser.add_argument("--per-topic", type=int, default=int(os.getenv("DIGEST_PER_TOPIC", "25")))
+    parser.add_argument("--per-topic", type=int, default=int(os.getenv("DIGEST_PER_TOPIC", "10")))
     parser.add_argument("--arxiv-retries", type=int, default=int(os.getenv("ARXIV_RETRIES", "3")))
     parser.add_argument(
         "--arxiv-retry-delay",
         type=float,
         default=float(os.getenv("ARXIV_RETRY_DELAY_SECONDS", "10.0")),
+    )
+    parser.add_argument(
+        "--arxiv-min-delay",
+        type=float,
+        default=float(os.getenv("ARXIV_MIN_DELAY_SECONDS", "3.5")),
+        help="Minimum delay between live arXiv requests.",
+    )
+    parser.add_argument(
+        "--arxiv-cache-dir",
+        type=Path,
+        default=Path(os.getenv("ARXIV_CACHE_DIR", "outputs/cache/arxiv")),
+        help="Local cache directory for raw arXiv API responses.",
+    )
+    parser.add_argument(
+        "--arxiv-cache-ttl-hours",
+        type=float,
+        default=float(os.getenv("ARXIV_CACHE_TTL_HOURS", "26")),
+        help="Fresh-cache window for arXiv API responses.",
     )
     parser.add_argument("--issue-date", help="Override issue date, format YYYY-MM-DD.")
     parser.add_argument("--publish-mode", choices=("none", "draft", "publish"), default=None)
@@ -231,6 +296,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=float,
         default=float(os.getenv("SEMANTIC_SCHOLAR_DELAY_SECONDS", "1.0")),
         help="Delay between Semantic Scholar requests, in seconds.",
+    )
+    parser.add_argument(
+        "--semantic-scholar-search-limit",
+        type=int,
+        default=int(os.getenv("SEMANTIC_SCHOLAR_SEARCH_LIMIT", "25")),
+        help="Maximum Semantic Scholar fallback papers per query.",
+    )
+    parser.add_argument(
+        "--fallback-sources",
+        default=os.getenv("PAPER_FALLBACK_SOURCES", "semantic-scholar,existing-json"),
+        help="Comma separated fallback sources after arXiv failure: semantic-scholar, existing-json, or off.",
     )
     parser.add_argument(
         "--topic-rotation",
@@ -280,6 +356,53 @@ def _load_recommendations_from_json(path: Path) -> list[RecommendedPaper]:
             )
         )
     return recommendations
+
+
+def _search_arxiv(args: argparse.Namespace, queries: list[str], max_results: int | None = None) -> list[Paper]:
+    client = ArxivClient(
+        retries=args.arxiv_retries,
+        retry_delay_seconds=args.arxiv_retry_delay,
+        min_delay_seconds=args.arxiv_min_delay,
+        cache_dir=args.arxiv_cache_dir,
+        cache_ttl_hours=args.arxiv_cache_ttl_hours,
+    )
+    return client.search_many(queries, max_results_per_query=max_results or args.per_topic)
+
+
+def _search_semantic_scholar(args: argparse.Namespace, queries: list[str]) -> list[Paper]:
+    client = SemanticScholarClient()
+    return client.search_many(
+        queries,
+        limit_per_query=args.semantic_scholar_search_limit,
+        delay_seconds=args.semantic_scholar_delay,
+    )
+
+
+def _semantic_queries_for_topics(topics: tuple[Any, ...], keywords: tuple[str, ...]) -> list[str]:
+    if keywords:
+        return [" ".join(keywords)]
+    queries: list[str] = []
+    for topic in topics:
+        topic_keywords = getattr(topic, "keywords", {})
+        if not isinstance(topic_keywords, dict):
+            continue
+        terms = [
+            str(term)
+            for term, _weight in sorted(topic_keywords.items(), key=lambda item: float(item[1]), reverse=True)[:7]
+        ]
+        if terms:
+            queries.append(" ".join(terms))
+    return queries
+
+
+def _fallback_sources(value: str) -> tuple[str, ...]:
+    values = parse_keyword_text(value.lower().replace("off", ""))
+    allowed = {"semantic-scholar", "existing-json"}
+    return tuple(source for source in values if source in allowed)
+
+
+def _digest_json_path(output_dir: Path, issue_date: date) -> Path:
+    return output_dir / f"{issue_date.isoformat()}-gnss-slam-digest.json"
 
 
 def _rerank_loaded_recommendations(
