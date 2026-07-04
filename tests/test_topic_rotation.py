@@ -4,7 +4,9 @@ import unittest
 from datetime import date, datetime, timedelta, timezone
 
 from daily_gnss_slam_digest.article import build_html, build_markdown
+from daily_gnss_slam_digest.cli import _rerank_loaded_recommendations
 from daily_gnss_slam_digest.config import ROTATING_TOPICS, rotating_topic_for_date
+from daily_gnss_slam_digest.models import Paper, RecommendedPaper
 from daily_gnss_slam_digest.recommender import recommend
 from daily_gnss_slam_digest.sample_data import SAMPLE_PAPERS
 
@@ -45,6 +47,48 @@ class TopicRotationTest(unittest.TestCase):
         self.assertNotIn("筛选方法论", html)
         self.assertNotIn("基于公开论文元数据生成", markdown)
         self.assertNotIn("基于公开论文元数据生成", html)
+
+    def test_from_json_rerender_keeps_only_current_topic_matches(self) -> None:
+        published = datetime(2026, 7, 4, tzinfo=timezone.utc)
+        loaded = [
+            _recommendation(
+                "GNSS Jamming Detection with AGC and CNO Observables",
+                "This work detects GNSS jamming and interference with receiver integrity signals.",
+                published,
+            ),
+            _recommendation(
+                "LiDAR Visual Inertial SLAM for Dense Mapping",
+                "This work studies SLAM, odometry, LiDAR, visual and inertial fusion.",
+                published,
+            ),
+        ]
+        pnt_topic = rotating_topic_for_date(date(2026, 7, 4))
+
+        reranked = _rerank_loaded_recommendations(
+            loaded,
+            limit=5,
+            days_back=30,
+            topics=(pnt_topic,),
+            issue_date=date(2026, 7, 4),
+        )
+
+        self.assertEqual([item.paper.title for item in reranked], ["GNSS Jamming Detection with AGC and CNO Observables"])
+
+def _recommendation(title: str, abstract: str, published: datetime) -> RecommendedPaper:
+    return RecommendedPaper(
+        paper=Paper(
+            title=title,
+            authors=("A. Author",),
+            abstract=abstract,
+            url="https://arxiv.org/abs/test",
+            pdf_url=None,
+            published=published,
+            updated=published,
+            categories=("cs.RO",),
+            primary_category="cs.RO",
+        ),
+        score=0.0,
+    )
 
 
 if __name__ == "__main__":

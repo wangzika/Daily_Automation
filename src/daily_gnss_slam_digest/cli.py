@@ -4,7 +4,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 from typing import Any
 
@@ -55,11 +55,24 @@ def main(argv: list[str] | None = None) -> int:
         focus_topic = "GNSS/融合/SLAM 综合方向"
 
     if args.from_json:
-        recommendations = _load_recommendations_from_json(args.from_json)
-        if not recommendations:
+        loaded_recommendations = _load_recommendations_from_json(args.from_json)
+        if not loaded_recommendations:
             print(f"No recommendations found in JSON: {args.from_json}", file=sys.stderr)
             return 2
         print(f"Using existing digest JSON: {args.from_json}")
+        recommendations = _rerank_loaded_recommendations(
+            loaded_recommendations,
+            limit=args.limit,
+            days_back=args.days_back,
+            topics=scoring_topics,
+            issue_date=issue_date,
+        )
+        if recommendations:
+            print(f"Filtered existing digest JSON to current topic profile: {focus_topic}")
+        else:
+            recommendations = loaded_recommendations[: args.limit]
+            focus_topic = "历史推荐综合补位"
+            print("Existing digest JSON has no strong match for today's topic; using a neutral fallback title.")
         papers = []
     elif args.sample:
         papers = SAMPLE_PAPERS
@@ -267,6 +280,19 @@ def _load_recommendations_from_json(path: Path) -> list[RecommendedPaper]:
             )
         )
     return recommendations
+
+
+def _rerank_loaded_recommendations(
+    recommendations: list[RecommendedPaper],
+    *,
+    limit: int,
+    days_back: int,
+    topics: tuple[Any, ...],
+    issue_date: date,
+) -> list[RecommendedPaper]:
+    papers = [item.paper for item in recommendations]
+    now = datetime.combine(issue_date, time.max, tzinfo=timezone.utc)
+    return recommend(papers, limit=limit, days_back=days_back, now=now, topics=topics)
 
 
 def _list_value(value: Any) -> list[Any]:

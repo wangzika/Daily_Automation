@@ -6,6 +6,7 @@
       "Anas Darwich",
       "Juliette Marais"
     ],
+    "abstract": "",
     "url": "http://arxiv.org/abs/2602.12688v1",
     "pdf_url": "https://arxiv.org/pdf/2602.12688v1",
     "published": "2026-02-13T07:43:35+00:00",
@@ -22,217 +23,19 @@
     "influential_citation_count": null,
     "venue": null,
     "code_url": null,
-    "score": 56.03,
+    "score": 26.01,
     "topic_scores": {
-      "GNSS 欺骗与干扰检测": 52.0
+      "韧性 PNT 与 GNSS 抗欺骗抗干扰": 22.0
     },
     "matched_terms": [
       "gnss",
-      "gps",
-      "spoofing",
       "jamming",
-      "interference",
-      "integrity",
-      "detection",
-      "receiver"
+      "agc"
     ],
     "quality_score": 0.0,
     "quality_signals": {
       "venue": "7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany"
     },
-    "reason": "主题贴合 GNSS 欺骗与干扰检测，关键词集中在 gnss、gps、spoofing、jamming、interference、integrity、detection、receiver。质量信号：venue 7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany，适合作为今日跟踪论文。"
-  },
-  {
-    "title": "LXD-SLAM: LiDAR+X Dense SLAM with $\\sum_{i=0}^{5}C_5^i$ Configurable Sensor Combinations",
-    "authors": [
-      "Zhong Wang",
-      "Lin Zhang",
-      "Linfei Li",
-      "Ying Shen",
-      "Shaoming Zhang",
-      "Pengcheng Shi",
-      "Shengjie Zhao"
-    ],
-    "url": "http://arxiv.org/abs/2606.27811v1",
-    "pdf_url": "https://arxiv.org/pdf/2606.27811v1",
-    "published": "2026-06-26T07:53:09+00:00",
-    "updated": "2026-06-26T07:53:09+00:00",
-    "categories": [
-      "cs.RO"
-    ],
-    "primary_category": "cs.RO",
-    "arxiv_id": "2606.27811",
-    "comment": null,
-    "journal_ref": null,
-    "doi": null,
-    "citation_count": null,
-    "influential_citation_count": null,
-    "venue": null,
-    "code_url": null,
-    "score": 112.07,
-    "topic_scores": {
-      "多模态/多传感器融合": 43.0,
-      "SLAM 与鲁棒里程计": 42.0
-    },
-    "matched_terms": [
-      "fusion",
-      "multi-sensor",
-      "lidar",
-      "visual",
-      "camera",
-      "imu",
-      "gnss",
-      "kalman",
-      "slam",
-      "odometry",
-      "localization",
-      "mapping",
-      "loop",
-      "degeneracy",
-      "robust",
-      "gaussian"
-    ],
-    "quality_score": 8.0,
-    "quality_signals": {
-      "code_url": "https://github.com/peterWon/LXD-SLAM",
-      "real_world_signal": true
-    },
-    "reason": "主题贴合 多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 fusion、multi-sensor、lidar、visual、camera、imu、gnss、kalman。质量信号：代码开源、强调真实实验，适合作为今日跟踪论文。"
-  },
-  {
-    "title": "Self-supervised Geometry Reasoning for LiDAR Simultaneous Localization and Mapping",
-    "authors": [
-      "Jiwoo Kim",
-      "Jinwoo Lee",
-      "Woojae Shin",
-      "Giseop Kim",
-      "Hyondong Oh"
-    ],
-    "url": "http://arxiv.org/abs/2606.30166v1",
-    "pdf_url": "https://arxiv.org/pdf/2606.30166v1",
-    "published": "2026-06-29T11:43:20+00:00",
-    "updated": "2026-06-29T11:43:20+00:00",
-    "categories": [
-      "cs.RO"
-    ],
-    "primary_category": "cs.RO",
-    "arxiv_id": "2606.30166",
-    "comment": null,
-    "journal_ref": null,
-    "doi": null,
-    "citation_count": null,
-    "influential_citation_count": null,
-    "venue": null,
-    "code_url": null,
-    "score": 51.33,
-    "topic_scores": {
-      "SLAM 与鲁棒里程计": 34.0
-    },
-    "matched_terms": [
-      "slam",
-      "odometry",
-      "localization",
-      "mapping",
-      "loop",
-      "gaussian"
-    ],
-    "quality_score": 0.0,
-    "quality_signals": {},
-    "reason": "主题贴合 SLAM 与鲁棒里程计，关键词集中在 slam、odometry、localization、mapping、loop、gaussian。质量信号以主题相关和新近度为主，适合作为今日跟踪论文。"
-  },
-  {
-    "title": "AUSLUN: A Fixed-Hover UAV--USV System for GNSS-Denied Maritime Search and Navigation",
-    "authors": [
-      "Siyuan Yang",
-      "Zikai Jia",
-      "Hailiang Kuang",
-      "Xiaoyu He",
-      "Qizhi Guo",
-      "Yihao Dong",
-      "Shaoming He"
-    ],
-    "url": "http://arxiv.org/abs/2606.29875v1",
-    "pdf_url": "https://arxiv.org/pdf/2606.29875v1",
-    "published": "2026-06-29T07:15:59+00:00",
-    "updated": "2026-06-29T07:15:59+00:00",
-    "categories": [
-      "cs.RO"
-    ],
-    "primary_category": "cs.RO",
-    "arxiv_id": "2606.29875",
-    "comment": "10 pages, 7 figures",
-    "journal_ref": null,
-    "doi": null,
-    "citation_count": null,
-    "influential_citation_count": null,
-    "venue": null,
-    "code_url": null,
-    "score": 68.78,
-    "topic_scores": {
-      "多模态/多传感器融合": 14.0,
-      "SLAM 与鲁棒里程计": 21.0
-    },
-    "matched_terms": [
-      "visual",
-      "inertial",
-      "gnss",
-      "odometry",
-      "localization",
-      "loop",
-      "vio"
-    ],
-    "quality_score": 14.0,
-    "quality_signals": {
-      "venue": "NAVIGATION",
-      "venue_bonus": 6.0,
-      "code_url": "https://github.com/xirhxq/pod_search",
-      "real_world_signal": true
-    },
-    "reason": "主题贴合 多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 visual、inertial、gnss、odometry、localization、loop、vio。质量信号：venue NAVIGATION、代码开源、强调真实实验，适合作为今日跟踪论文。"
-  },
-  {
-    "title": "DL-VINS-Factory: A Modular Framework for Learned Visual Front-Ends in Visual-Inertial SLAM",
-    "authors": [
-      "Shoon Kit Lim",
-      "Melissa Jia Ying Chong",
-      "Ting Yang Ling"
-    ],
-    "url": "http://arxiv.org/abs/2607.01757v1",
-    "pdf_url": "https://arxiv.org/pdf/2607.01757v1",
-    "published": "2026-07-02T06:17:33+00:00",
-    "updated": "2026-07-02T06:17:33+00:00",
-    "categories": [
-      "cs.CV",
-      "cs.RO"
-    ],
-    "primary_category": "cs.CV",
-    "arxiv_id": "2607.01757",
-    "comment": null,
-    "journal_ref": null,
-    "doi": null,
-    "citation_count": null,
-    "influential_citation_count": null,
-    "venue": null,
-    "code_url": null,
-    "score": 68.03,
-    "topic_scores": {
-      "多模态/多传感器融合": 18.0,
-      "SLAM 与鲁棒里程计": 21.0
-    },
-    "matched_terms": [
-      "visual",
-      "camera",
-      "inertial",
-      "tightly coupled",
-      "slam",
-      "odometry",
-      "loop"
-    ],
-    "quality_score": 8.5,
-    "quality_signals": {
-      "code_url": "https://github.com/limshoonkit/DL-VINS-Factory-ROS2",
-      "dataset_signal": true
-    },
-    "reason": "主题贴合 多模态/多传感器融合、SLAM 与鲁棒里程计，关键词集中在 visual、camera、inertial、tightly coupled、slam、odometry、loop。质量信号：代码开源、有数据集/benchmark 线索，适合作为今日跟踪论文。"
+    "reason": "主题贴合 韧性 PNT 与 GNSS 抗欺骗抗干扰，关键词集中在 gnss、jamming、agc。质量信号：venue 7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany，适合作为今日跟踪论文。"
   }
 ]

@@ -161,7 +161,7 @@ def build_markdown(summary: dict[str, Any], end_date: date) -> str:
             "",
             _editor_note(summary),
             "",
-            "> 本周汇总基于本项目每日推荐 JSON 自动生成，适合做周报选题池，正式引用实验结论前仍建议回到原文核对。",
+            "> 正式引用实验结论前，建议回到原文核对数据集、指标和实验设置。",
         ]
     )
     return "\n".join(lines).strip() + "\n"
@@ -192,7 +192,7 @@ def build_html(summary: dict[str, Any], end_date: date) -> str:
         [
             _section_title("编辑观察"),
             _callout(_editor_note(summary)),
-            '<p style="margin:22px 0 0;color:#8a9da3;font-size:12px;line-height:1.8;">本周汇总基于本项目每日推荐 JSON 自动生成，适合做周报选题池，正式引用实验结论前仍建议回到原文核对。</p>',
+            '<p style="margin:22px 0 0;color:#8a9da3;font-size:12px;line-height:1.8;">正式引用实验结论前，建议回到原文核对数据集、指标和实验设置。</p>',
             "</section>",
         ]
     )
@@ -253,7 +253,9 @@ def _quality_summary(paper: WeeklyPaper) -> str:
 def _directions_for(paper: WeeklyPaper) -> list[str]:
     terms = set(paper.matched_terms)
     directions = []
-    if {"gnss", "gps", "spoofing", "jamming", "integrity", "interference"} & terms:
+    gnss_platform_terms = {"gnss", "gps", "pnt", "receiver", "ais", "resilient pnt", "gnss denied", "osnma", "leo pnt"}
+    gnss_risk_terms = {"spoofing", "jamming", "integrity", "interference", "attack", "anomaly", "c/n0", "agc"}
+    if (gnss_platform_terms & terms) and (gnss_risk_terms & terms):
         directions.append("GNSS 完整性与欺骗/干扰检测")
     if {"fusion", "multi-sensor", "multimodal", "lidar", "visual", "inertial", "imu"} & terms:
         directions.append("多模态融合与传感器退化处理")
@@ -271,7 +273,7 @@ def _robotics_trends_for(paper: WeeklyPaper) -> list[str]:
     matches: list[tuple[str, float]] = []
     for topic in ROBOTICS_TREND_TOPICS:
         score = _trend_score(text, topic)
-        if score >= _trend_threshold(topic):
+        if score >= _trend_threshold(topic) and _passes_trend_gate(text, topic):
             matches.append((topic.cn_name, score))
     matches.sort(key=lambda item: item[1], reverse=True)
     return [name for name, _score in matches[:3]]
@@ -301,6 +303,16 @@ def _trend_threshold(topic: TopicProfile) -> float:
     return 8.0
 
 
+def _passes_trend_gate(text: str, topic: TopicProfile) -> bool:
+    if topic.name == "resilient_pnt_gnss_denied":
+        platform_terms = ("gnss", "gps", "pnt", "receiver", "ais", "resilient pnt", "gnss denied", "osnma", "leo pnt")
+        risk_terms = ("spoofing", "jamming", "integrity", "interference", "attack", "anomaly", "c/n0", "agc")
+        return any(_contains_term(text, term) for term in platform_terms) and any(
+            _contains_term(text, term) for term in risk_terms
+        )
+    return True
+
+
 def _contains_term(text: str, term: str) -> bool:
     lowered = term.lower()
     if " " in lowered or "-" in lowered or "/" in lowered:
@@ -327,7 +339,11 @@ def _deduplicate_weekly_papers(papers: list[WeeklyPaper]) -> list[WeeklyPaper]:
     for paper in papers:
         key = _normalized_title(paper.title) or paper.url
         current = best.get(key)
-        if current is None or (paper.quality_score, paper.score) > (current.quality_score, current.score):
+        if current is None or (paper.quality_score, paper.score, paper.source_date) > (
+            current.quality_score,
+            current.score,
+            current.source_date,
+        ):
             best[key] = paper
     return list(best.values())
 

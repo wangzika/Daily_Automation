@@ -486,6 +486,7 @@ def _to_json(recommendations: list[RecommendedPaper]) -> str:
             {
                 "title": paper.title,
                 "authors": list(paper.authors),
+                "abstract": paper.abstract,
                 "url": paper.url,
                 "pdf_url": paper.pdf_url,
                 "published": paper.published.isoformat(),
