@@ -1,0 +1,120 @@
+[
+  {
+    "title": "GeoMix: Descriptor-Free Visual Localization via Global Context and Multi-Detector Training",
+    "authors": [
+      "Yejun Zhang",
+      "Xinjue Wang",
+      "Zihan Wang",
+      "Esa Rahtu",
+      "Juho Kannala"
+    ],
+    "abstract": "Descriptor-free visual localization eliminates high-dimensional descriptor storage, preserves scene privacy, and simplifies map maintenance, yet its accuracy still lags far behind descriptor-based pipelines. We identify this gap to insufficient geometric discriminability in geometry-only matching. Without visual appearance, current methods underutilize local geometry cues, lack the global context among keypoints, and overfit to a single keypoint detector. We further observe that descriptor-free matching naturally enables multi-detector training, as heterogeneous keypoints can be optimized in a shared geometry-only space without aligning descriptor spaces. Building on these insights, we propose GeoMix, a descriptor-free 2D-3D matching framework that strengthens geometric discriminability at three levels. Locally, directional and distance-aware embeddings enrich neighborhood aggregation with fine-grained spatial structure. Globally, learnable context nodes aggregate and redistribute scene-wide information via cross-attention to resolve ambiguities beyond local receptive fields. At the training level, Mix-Training exploits this detector-agnostic geometry space to learn representations across multiple keypoint detectors. Extensive experiments on MegaDepth, Cambridge Landmarks, 7Scenes, and Aachen Day-Night show that GeoMix sets a new state of the art among descriptor-free methods, reducing 75th-percentile rotation error by 89\\% and translation error by up to 90\\% over the previous best, while generalizing zero-shot to unseen detectors and narrowing the gap to descriptor-based pipelines. Code is available at $\\href{https://github.com/YejunZhang/Geomix}{\\text{this links}}$.",
+    "url": "http://arxiv.org/abs/2607.02486v1",
+    "pdf_url": "https://arxiv.org/pdf/2607.02486v1",
+    "published": "2026-07-02T17:52:41+00:00",
+    "updated": "2026-07-02T17:52:41+00:00",
+    "categories": [
+      "cs.CV"
+    ],
+    "primary_category": "cs.CV",
+    "arxiv_id": "2607.02486",
+    "comment": "ECCV 2026",
+    "journal_ref": null,
+    "doi": null,
+    "citation_count": null,
+    "influential_citation_count": null,
+    "venue": null,
+    "code_url": null,
+    "score": 36.52,
+    "topic_scores": {
+      "自定义研究主题": 6.0
+    },
+    "matched_terms": [
+      "level"
+    ],
+    "quality_score": 12.5,
+    "quality_signals": {
+      "venue": "ECCV",
+      "venue_bonus": 6.5,
+      "code_url": "https://github.com/YejunZhang/Geomix}{\\text{this"
+    },
+    "reason": "主题贴合 自定义研究主题，关键词集中在 level。质量信号：venue ECCV、代码开源，适合作为今日跟踪论文。"
+  },
+  {
+    "title": "LACUNA: A Testbed for Evaluating Localization Precision for LLM Unlearning",
+    "authors": [
+      "Matteo Boglioni",
+      "Thibault Rousset",
+      "Siva Reddy",
+      "Marius Mosbach",
+      "Verna Dankers"
+    ],
+    "abstract": "LLMs memorize sensitive training data, including personally identifiable information (PII), creating a pressing need for reliable post hoc removal methods. Unlearning has emerged as a promising solution, with state-of-the-art(SOTA) methods often following a localize-first, unlearn-second paradigm that targets specific model parameters. However, existing benchmarks evaluate unlearning solely at the output level, leaving open the question of whether unlearning truly erases knowledge from a model's parameters or merely obfuscates it, a concern reinforced by the success of resurfacing attacks. To bridge this gap, we introduce LACUNA: the first unlearning testbed with ground-truth parameter-level localization. LACUNA injects PII of synthetic individuals into predefined parameters of 1B and 7B OLMo-based models via masked continual pretraining, enabling direct evaluation of whether unlearning targets the weights responsible for knowledge storage. We use LACUNA to benchmark current SOTA unlearning methods and find that, despite strong output-level performance, existing methods are highly imprecise and susceptible to resurfacing attacks. We further show that when localization is successful, even a simple gradient-based unlearning method achieves strong erasure and robustness to resurfacing attacks, highlighting the importance of precise unlearning. We release LACUNA to complement behavioral evaluations and drive further advances in robust, localization-based unlearning.",
+    "url": "http://arxiv.org/abs/2607.02513v1",
+    "pdf_url": "https://arxiv.org/pdf/2607.02513v1",
+    "published": "2026-07-02T17:59:52+00:00",
+    "updated": "2026-07-02T17:59:52+00:00",
+    "categories": [
+      "cs.CL",
+      "cs.AI",
+      "cs.LG"
+    ],
+    "primary_category": "cs.CL",
+    "arxiv_id": "2607.02513",
+    "comment": null,
+    "journal_ref": null,
+    "doi": null,
+    "citation_count": null,
+    "influential_citation_count": null,
+    "venue": null,
+    "code_url": null,
+    "score": 26.52,
+    "topic_scores": {
+      "自定义研究主题": 6.0
+    },
+    "matched_terms": [
+      "level"
+    ],
+    "quality_score": 2.5,
+    "quality_signals": {
+      "dataset_signal": true
+    },
+    "reason": "主题贴合 自定义研究主题，关键词集中在 level。质量信号：有数据集/benchmark 线索，适合作为今日跟踪论文。"
+  },
+  {
+    "title": "Human Capital, Not Model Benchmarks, Predicts Hybrid Intelligence in Forecasting",
+    "authors": [
+      "Vivienne Ming"
+    ],
+    "abstract": "Whether pairing people with AI helps or hurts is usually reported as a single average effect. Using a real-money prediction market (Polymarket) as an objective, externally resolved benchmark, this pilot shows that the value of human-AI collaboration depends on a specific, measurable form of human capital. Analyzed at the level of the individual forecaster, hybrid performance is trimodal: most people either deferred to the model (matching it) or used it to rubber-stamp a prior guess (performing worse than the model alone), while a minority engaged in genuine complementary reasoning and reached accuracy matching or even exceeding (i.e., lower error than) the market itself. Collaborative traits (perspective-taking, intellectual humility, and curiosity) rather than raw cognitive ability or model benchmarks, distinguished who reached that mode. The results are preliminary but statistically robust, and motivate a pre-registered replication now in preparation.",
+    "url": "http://arxiv.org/abs/2607.02467v1",
+    "pdf_url": "https://arxiv.org/pdf/2607.02467v1",
+    "published": "2026-07-02T17:34:37+00:00",
+    "updated": "2026-07-02T17:34:37+00:00",
+    "categories": [
+      "cs.CY",
+      "cs.AI"
+    ],
+    "primary_category": "cs.CY",
+    "arxiv_id": "2607.02467",
+    "comment": "4 pages, 1 figure, PNAS brief style",
+    "journal_ref": null,
+    "doi": null,
+    "citation_count": null,
+    "influential_citation_count": null,
+    "venue": null,
+    "code_url": null,
+    "score": 26.51,
+    "topic_scores": {
+      "自定义研究主题": 6.0
+    },
+    "matched_terms": [
+      "level"
+    ],
+    "quality_score": 2.5,
+    "quality_signals": {
+      "dataset_signal": true
+    },
+    "reason": "主题贴合 自定义研究主题，关键词集中在 level。质量信号：有数据集/benchmark 线索，适合作为今日跟踪论文。"
+  }
+]
