@@ -23,15 +23,18 @@ def build_markdown(
     lines: list[str] = [
         f"# {title}",
         "",
-        f"今天的轮换主题是：**{focus_topic}**。筛选逻辑优先考虑主题相关性、新近度、引用/venue/开源代码等质量信号，以及是否能给工程系统带来可验证的思路。",
-        "",
-        "## 筛选方法论",
-        "",
-        "这份日报不是简单按 arXiv 最新排序，而是先用主题查询收集候选论文，再做标题级去重，并按关键词命中、主题覆盖、发布时间、引用/venue/代码/数据集线索和工程迁移价值排序。阅读时建议重点看：问题定义是否清晰、观测量是否可靠、融合位置是否合理、实验是否覆盖失败案例。",
-        "",
     ]
-    if "methodology" in image_paths:
-        lines.extend([f"![筛选方法论]({image_paths['methodology']})", ""])
+    if "header" in image_paths:
+        lines.extend([f"![{focus_topic}]({image_paths['header']})", ""])
+
+    lines.extend(
+        [
+            f"今天这期看 **{focus_topic}**。",
+            "",
+            _opening_note(focus_topic, len(recommendations)),
+            "",
+        ]
+    )
 
     lines.extend(["## 今日速览", ""])
     for index, item in enumerate(recommendations, start=1):
@@ -65,20 +68,17 @@ def build_markdown(
             ]
         )
 
-    if "rubric" in image_paths:
-        lines.extend(["## 推荐阅读框架", "", f"![推荐阅读框架]({image_paths['rubric']})", ""])
-
     lines.extend(
         [
             "## 今日观察",
             "",
-            "GNSS 相关论文正在从单点接收机检测走向跨传感器、跨平台和时空一致性验证；SLAM 方向则越来越强调在退化、动态和大尺度场景下的恢复能力。对自动驾驶、无人机和机器人系统来说，下一步值得重点关注的是：把 GNSS 完整性监测放进状态估计闭环，而不是只把它当成后处理告警。",
+            _topic_observation(focus_topic),
             "",
             "## 明日检索关键词",
             "",
             "、".join(f"`{term}`" for term in suggested_terms) + "。",
             "",
-            "> 本文基于公开论文元数据生成，建议阅读原文后再引用具体实验结论。",
+            "> 具体实验结论建议回到原文核对后再引用。",
         ]
     )
     return "\n".join(lines).strip() + "\n"
@@ -95,23 +95,23 @@ def build_html(
     focus_topic = focus_topic or "GNSS 欺骗/干扰检测、多模态融合定位、SLAM 与鲁棒里程计"
     suggested_terms = _suggested_terms_for_focus(focus_topic)
 
-    body_parts: list[str] = [
-        (
-            '<section style="margin:0 0 20px;padding:18px 18px 16px;'
-            'border-left:4px solid #25d8b8;background:#f5fbfa;color:#24343a;'
-            'line-height:1.85;font-size:15px;">'
-            f"今天的轮换主题是 <strong>{html.escape(focus_topic)}</strong>。"
-            "筛选逻辑优先考虑主题相关性、新近度、引用/venue/开源代码等质量信号，"
-            "以及是否能给工程系统带来可验证的思路。"
-            "</section>"
-        ),
-        _section_title("筛选方法论"),
-        _paragraph("这份日报不是简单按 arXiv 最新排序，而是先用主题查询收集候选论文，再做标题级去重，并按关键词命中、主题覆盖、发布时间、引用/venue/代码/数据集线索和工程迁移价值排序。读者可以把它当成一个每日研究雷达：先定位方向，再判断是否值得阅读全文。"),
-    ]
-    if "methodology" in image_urls:
-        body_parts.append(_article_image(image_urls["methodology"], "方法论：从论文流到工程判断"))
+    body_parts: list[str] = []
+    if "header" in image_urls:
+        body_parts.append(_article_image(image_urls["header"], ""))
 
-    body_parts.extend([_method_cards(), _section_title("今日速览")])
+    body_parts.extend(
+        [
+            (
+                '<section style="margin:0 0 20px;padding:18px 18px 16px;'
+                'border-left:4px solid #25d8b8;background:#f5fbfa;color:#24343a;'
+                'line-height:1.85;font-size:15px;">'
+                f"今天这期看 <strong>{html.escape(focus_topic)}</strong>。"
+                f"{html.escape(_opening_note(focus_topic, len(recommendations)))}"
+                "</section>"
+            ),
+            _section_title("今日速览"),
+        ]
+    )
 
     for index, item in enumerate(recommendations, start=1):
         paper = item.paper
@@ -129,16 +129,13 @@ def build_html(
     for index, item in enumerate(recommendations, start=1):
         body_parts.append(_paper_card(index, item))
 
-    if "rubric" in image_urls:
-        body_parts.extend([_section_title("推荐阅读框架"), _article_image(image_urls["rubric"], "推荐阅读框架")])
-
     body_parts.extend(
         [
             _section_title("今日观察"),
-            _callout("GNSS 相关论文正在从单点接收机检测走向跨传感器、跨平台和时空一致性验证；SLAM 方向则越来越强调在退化、动态和大尺度场景下的恢复能力。对自动驾驶、无人机和机器人系统来说，下一步值得重点关注的是：把 GNSS 完整性监测放进状态估计闭环，而不是只把它当成后处理告警。"),
+            _callout(_topic_observation(focus_topic)),
             _section_title("明日检索关键词"),
             _tag_line(suggested_terms),
-            '<p style="margin:22px 0 0;color:#8a9da3;font-size:13px;line-height:1.8;">本文基于公开论文元数据生成，建议阅读原文后再引用具体实验结论。</p>',
+            '<p style="margin:22px 0 0;color:#8a9da3;font-size:13px;line-height:1.8;">具体实验结论建议回到原文核对后再引用。</p>',
         ]
     )
 
@@ -187,6 +184,42 @@ def build_digest(recommendations: list[RecommendedPaper], focus_topic: str = "")
     first = recommendations[0].paper.title
     topic_text = focus_topic or "GNSS 欺骗检测、多模态融合与 SLAM"
     return f"今日围绕 {topic_text} 精选 {len(recommendations)} 篇相关论文，重点推荐：{first}"
+
+
+def _opening_note(focus_topic: str, count: int) -> str:
+    if "具身导航" in focus_topic:
+        return f"我挑了 {count} 篇最近值得看的论文，重点放在语言指令、视觉理解和移动机器人决策怎样接到一起。这个方向热闹，但真正有价值的工作通常能说明机器人在哪里失败、怎样恢复、能否走出仿真。"
+    if "3DGS" in focus_topic or "NeRF" in focus_topic:
+        return f"我挑了 {count} 篇最近值得看的论文，重点放在神经场地图和实时 SLAM 的结合。读这类工作时，最值得盯住的是地图表达带来的增益，是否抵得过计算、内存和动态场景里的代价。"
+    if "开放词汇" in focus_topic:
+        return f"我挑了 {count} 篇最近值得看的论文，重点看语义地图怎样从“能建图”走向“能听懂任务”。如果地图里的物体、区域和语言目标能稳定对上，导航系统就会多一层可解释的抓手。"
+    if "地点识别" in focus_topic:
+        return f"我挑了 {count} 篇最近值得看的论文，重点看长期定位和回环检测。一个系统能不能在季节、天气、光照和视角变化后认出同一个地方，往往决定它能不能长期运行。"
+    if "多机器人" in focus_topic:
+        return f"我挑了 {count} 篇最近值得看的论文，重点看多机器人之间怎样共享地图、约束和相对位姿。协同 SLAM 的难点不只是多几台设备，而是通信受限、错误关联和全局一致性会同时出现。"
+    if "PNT" in focus_topic or "GNSS" in focus_topic:
+        return f"我挑了 {count} 篇最近值得看的论文，重点看 GNSS 异常、PNT 完整性和抗欺骗抗干扰。真正有用的工作不只报告检测率，还会说明误报从哪里来，以及定位系统怎样在告警后继续工作。"
+    if "退化场景" in focus_topic or "里程计" in focus_topic:
+        return f"我挑了 {count} 篇最近值得看的论文，重点看视觉、激光、惯导和 GNSS 在退化场景里的互相补位。鲁棒里程计的关键不是传感器堆得多，而是知道什么时候该相信谁。"
+    return f"我挑了 {count} 篇最近值得看的论文，重点看它们能给机器人导航、定位和建图系统带来什么具体启发。"
+
+
+def _topic_observation(focus_topic: str) -> str:
+    if "具身导航" in focus_topic:
+        return "具身导航正在从“给定目标点”转向“理解人的意图”。这会把定位、地图、感知和策略学习绑得更紧：机器人不仅要知道自己在哪，还要知道目标是什么、哪些路径可执行、失败后怎样重新规划。"
+    if "3DGS" in focus_topic or "NeRF" in focus_topic:
+        return "神经场 SLAM 的吸引力在于地图更稠密、更接近可渲染世界；挑战在于实时性、内存占用和动态物体处理。近期值得关注的是：这些方法能否从漂亮重建走向稳定定位。"
+    if "开放词汇" in focus_topic:
+        return "开放词汇语义地图把语言和空间连起来，让机器人可以围绕“桌子旁边”“红色门口”这类目标行动。下一步的关键，是让语义标签在长期运行中保持一致，而不是每次换视角就重新猜一遍。"
+    if "地点识别" in focus_topic:
+        return "长期定位的核心问题很朴素：同一个地方在不同时间看起来不像同一个地方。好的地点识别方法要在外观变化中抓住稳定结构，同时避免把相似走廊、路口和建筑误认为回环。"
+    if "多机器人" in focus_topic:
+        return "多机器人 SLAM 的价值不只是更快建图，而是让系统在单机视野不足时仍能补全环境。难点也很现实：带宽有限、坐标系不统一、错误回环会被迅速放大。"
+    if "PNT" in focus_topic or "GNSS" in focus_topic:
+        return "PNT 韧性正在从单一 GNSS 接收机指标，走向多源一致性判断。对机器人和无人系统来说，更可靠的做法是把欺骗、干扰、遮挡和传感器退化一起放进状态估计链路里处理。"
+    if "退化场景" in focus_topic or "里程计" in focus_topic:
+        return "鲁棒里程计最怕的是系统不知道自己已经不可靠。最近的趋势是把退化检测、传感器可信度和因子图约束放在一起，让系统在弱纹理、强动态、空旷或遮挡场景下有更平滑的降级能力。"
+    return "导航定位论文越来越强调真实平台里的稳定性：不仅要在标准数据集上好看，还要能解释误差从哪里来、失败后怎样恢复、部署时要付出多少计算和传感器成本。"
 
 
 def _format_authors(authors: tuple[str, ...]) -> str:
@@ -353,10 +386,7 @@ def _abstract_digest(item: RecommendedPaper) -> str:
         focus = "问题设定、数据集、对比基线和失败案例"
 
     method_terms = _format_terms(item.matched_terms[:6])
-    return (
-        f"从题名与摘要看，论文主要关注 {domain}；方法线索包括 {method_terms}。"
-        f"阅读全文时建议重点看 {focus}，再判断是否适合迁移到自己的工程链路。"
-    )
+    return f"从题名与摘要看，论文主要关注 {domain}；技术线索包括 {method_terms}。阅读全文时建议重点看 {focus}，再判断是否适合迁移到自己的工程链路。"
 
 
 def _paragraph(text: str) -> str:
@@ -373,10 +403,15 @@ def _section_title(text: str) -> str:
 
 
 def _article_image(src: str, caption: str) -> str:
+    caption_html = (
+        f'<p style="margin:8px 0 0;text-align:center;color:#7f9399;font-size:12px;">{html.escape(caption)}</p>'
+        if caption
+        else ""
+    )
     return (
         '<section style="margin:16px 0 20px;">'
         f'<img src="{html.escape(src)}" alt="{html.escape(caption)}" style="display:block;width:100%;height:auto;border-radius:8px;"/>'
-        f'<p style="margin:8px 0 0;text-align:center;color:#7f9399;font-size:12px;">{html.escape(caption)}</p>'
+        f"{caption_html}"
         "</section>"
     )
 

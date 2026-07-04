@@ -83,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
         print("No matching papers found.", file=sys.stderr)
         return 2
 
-    asset_paths = ensure_article_assets(args.output_dir, issue_date)
+    asset_paths = ensure_article_assets(args.output_dir, issue_date, focus_topic=focus_topic)
     local_image_paths = {key: path.name for key, path in asset_paths.items()}
     paths = write_outputs(
         recommendations,
