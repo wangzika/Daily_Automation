@@ -208,13 +208,13 @@ def process_unread_commands(
 
 def command_from_message(message: Message, config: EmailCommandConfig) -> PaperCommand | None:
     sender = parseaddr(str(message.get("From", "")))[1].lower()
-    subject = _decode_header(str(message.get("Subject", "")))
+    subject = _normalize_command_text(_decode_header(str(message.get("Subject", ""))))
     if sender not in config.allowed_senders:
         return None
     if config.subject_keyword and config.subject_keyword.lower() not in subject.lower():
         return None
 
-    text = subject + "\n" + _message_text(message)
+    text = _normalize_command_text(subject + "\n" + _message_text(message))
     fields = _parse_fields(text)
     keywords = fields.get("keywords") or fields.get("keyword") or fields.get("关键词") or fields.get("关键字") or ""
     keywords = keywords.strip()
@@ -275,16 +275,43 @@ def execute_command(command: PaperCommand) -> dict[str, object]:
     steps: list[dict[str, object]] = []
     python = _python_executable(env)
     if "digest" in command.tasks:
-        steps.append(_run_step("Generate keyword digest", _digest_command(command, run_dir, today, python, env), env))
+        digest_step = _run_step("Generate keyword digest", _digest_command(command, run_dir, today, python, env), env)
+        if _is_wechat_ip_blocked_step(digest_step) and digest_json.exists():
+            digest_step = {
+                **digest_step,
+                "returncode": 0,
+                "note": "WeChat IP whitelist blocked draft creation; local digest files were generated.",
+            }
+        steps.append(digest_step)
     if "deepdive" in command.tasks and digest_json.exists():
-        steps.append(_run_step("Generate keyword deep dives", _deepdive_command(command, digest_json, run_dir, python, env), env))
+        deepdive_step = _run_step(
+            "Generate keyword deep dives",
+            _deepdive_command(command, digest_json, run_dir, python, env),
+            env,
+        )
+        if command.mode != "none" and _is_wechat_ip_blocked_step(deepdive_step):
+            fallback_step = _run_step(
+                "Generate keyword deep dives locally",
+                _with_publish_mode(_deepdive_command(command, digest_json, run_dir, python, env), "none"),
+                env,
+            )
+            if int(fallback_step.get("returncode", 1)) == 0:
+                deepdive_step = {
+                    **deepdive_step,
+                    "returncode": 0,
+                    "note": "WeChat IP whitelist blocked draft creation; local deep-dive files were generated.",
+                }
+            else:
+                steps.append(deepdive_step)
+                deepdive_step = fallback_step
+        steps.append(deepdive_step)
     elif "deepdive" in command.tasks:
         steps.append({"label": "Generate keyword deep dives", "returncode": 2, "note": f"missing {digest_json}"})
     if "weekly" in command.tasks:
         steps.append(_run_step("Generate weekly summary", _weekly_command(today, python, env), env))
 
     if _bool_env("EMAIL_COMMAND_GIT_PUSH", True):
-        steps.append(_git_commit_and_push(run_id))
+        steps.append(_git_commit_and_push(run_id, run_dir))
 
     status = 0 if all(int(step.get("returncode", 0)) == 0 for step in steps) else 1
     return {"status": status, "run_id": run_id, "run_dir": str(run_dir), "digest_json": str(digest_json), "steps": steps}
@@ -292,8 +319,17 @@ def execute_command(command: PaperCommand) -> dict[str, object]:
 
 def _run_step(label: str, command: list[str], env: dict[str, str]) -> dict[str, object]:
     print(f"==> {label}: {' '.join(command)}")
-    result = subprocess.run(command, env=env)
-    return {"label": label, "returncode": result.returncode}
+    result = subprocess.run(command, env=env, text=True, capture_output=True)
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+    output = (result.stdout or "") + (result.stderr or "")
+    step: dict[str, object] = {"label": label, "returncode": result.returncode}
+    note = _step_note(output)
+    if note:
+        step["note"] = note
+    return step
 
 
 def _python_executable(env: dict[str, str]) -> str:
@@ -354,6 +390,17 @@ def _deepdive_command(
         "--publish-mode",
         command.mode,
     ]
+
+
+def _with_publish_mode(command: list[str], mode: str) -> list[str]:
+    updated = list(command)
+    try:
+        mode_index = updated.index("--publish-mode") + 1
+    except ValueError:
+        return [*updated, "--publish-mode", mode]
+    if mode_index < len(updated):
+        updated[mode_index] = mode
+    return updated
 
 
 def _weekly_command(issue_date: str, python: str, env: dict[str, str]) -> list[str]:
@@ -474,9 +521,13 @@ def _message_datetime(message: Message) -> datetime | None:
     return parsed.astimezone()
 
 
-def _git_commit_and_push(run_id: str) -> dict[str, object]:
+def _git_commit_and_push(run_id: str, run_dir: Path) -> dict[str, object]:
     print("==> Commit and push email command outputs")
-    add = subprocess.run(["git", "add", "outputs", "README.md", ".env.example", "docs", "scripts", "src", "tests"])
+    add_paths = [str(run_dir)]
+    weekly_dir = Path("outputs/weekly")
+    if weekly_dir.exists():
+        add_paths.append(str(weekly_dir))
+    add = subprocess.run(["git", "add", *add_paths])
     if add.returncode != 0:
         return {"label": "Commit and push email command outputs", "returncode": add.returncode}
     diff = subprocess.run(["git", "diff", "--cached", "--quiet"])
@@ -521,8 +572,8 @@ def _parse_fields(text: str) -> dict[str, str]:
             key, value = line.split("：", 1)
         else:
             continue
-        key = key.strip().lower().replace(" ", "_").replace("-", "_")
-        value = value.strip()
+        key = _normalize_command_text(key).strip().lower().replace(" ", "_").replace("-", "_")
+        value = _normalize_command_text(value).strip()
         if key and value:
             fields[key] = value
     return fields
@@ -604,7 +655,34 @@ def _message_text(message: Message) -> str:
 
 
 def _strip_html(value: str) -> str:
-    return html.unescape(re.sub(r"<[^>]+>", " ", value))
+    value = re.sub(r"(?i)<\s*br\s*/?\s*>", "\n", value)
+    value = re.sub(r"(?i)</\s*(p|div|li|tr|h[1-6])\s*>", "\n", value)
+    return _normalize_command_text(re.sub(r"<[^>]+>", " ", value))
+
+
+def _normalize_command_text(value: str) -> str:
+    value = html.unescape(value)
+    return value.replace("\xa0", " ").replace("\u200b", "").replace("\ufeff", "")
+
+
+def _step_note(output: str) -> str:
+    if _is_wechat_ip_blocked_text(output):
+        match = re.search(r"invalid ip\s+([0-9.]+)", output)
+        ip_hint = f" ({match.group(1)})" if match else ""
+        return f"WeChat IP whitelist blocked{ip_hint}."
+    if "HTTP 429" in output or "rate limited" in output.lower():
+        return "External source rate limited; fallback/cache may have been used."
+    return ""
+
+
+def _is_wechat_ip_blocked_step(step: dict[str, object]) -> bool:
+    note = str(step.get("note") or "")
+    return "WeChat IP whitelist blocked" in note
+
+
+def _is_wechat_ip_blocked_text(output: str) -> bool:
+    lowered = output.lower()
+    return "40164" in lowered and "invalid ip" in lowered and "whitelist" in lowered
 
 
 def _decode_header(value: str) -> str:
