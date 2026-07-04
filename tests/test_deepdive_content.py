@@ -6,6 +6,9 @@ from pathlib import Path
 from daily_gnss_slam_digest.deepdive import (
     DeepDiveFigure,
     PaperReading,
+    _display_figure_caption,
+    _extract_base64_image,
+    _image_variants,
     build_deepdive_html,
     build_deepdive_markdown,
 )
@@ -59,6 +62,52 @@ class DeepDiveContentTest(unittest.TestCase):
             self.assertNotIn("引言部分", text)
             self.assertNotIn("通常", text)
             self.assertNotIn("一般", text)
+
+    def test_ai_figure_is_labeled_as_auxiliary_illustration(self) -> None:
+        paper = {
+            "title": "GNSS Timing Spoofing Protection Level",
+            "authors": ["A. Reader"],
+            "abstract": "This paper studies timing spoofing protection levels for GNSS receivers.",
+            "published": "2026-07-01T00:00:00+00:00",
+            "url": "http://arxiv.org/abs/2607.00001v1",
+            "matched_terms": ["gnss", "timing", "spoofing"],
+        }
+        reading = PaperReading(
+            abstract=str(paper["abstract"]),
+            introduction="GNSS timing users need a bound on undetected spoofing.",
+            method="The method builds a timing protection level from receiver observables.",
+            experiments="The evaluation uses recorded spoofing data and timing error metrics.",
+            conclusion="The protection level gives a conservative timing-risk budget.",
+            captions=(),
+        )
+        figures = [DeepDiveFigure(Path("ai-cover.jpg"), "授时欺骗与保护级的概念示意", source="ai")]
+
+        markdown = build_deepdive_markdown(paper, reading, figures, {"figure_1": "ai-cover.jpg"})
+        html = build_deepdive_html(paper, reading, figures, {"figure_1": "ai-cover.jpg"})
+
+        self.assertIn("主图：授时欺骗与保护级的概念示意", markdown)
+        self.assertIn("主图为辅助示意图", markdown)
+        self.assertIn("主图为辅助示意图", html)
+
+    def test_figure_caption_removes_duplicate_number_prefixes(self) -> None:
+        caption = "图 1 . Fig. 1: System Overview. The proposed framework."
+        self.assertEqual(_display_figure_caption(caption, 1), "主图：System Overview")
+
+    def test_image_variants_support_both_modes(self) -> None:
+        self.assertEqual(_image_variants("both"), ("paper", "ai"))
+        self.assertEqual(_image_variants("paper"), ("paper",))
+
+    def test_extract_base64_image_from_gemini_payload(self) -> None:
+        payload = {
+            "output": [
+                {
+                    "content": [
+                        {"inlineData": {"mimeType": "image/png", "data": "YWJj"}},
+                    ]
+                }
+            ]
+        }
+        self.assertEqual(_extract_base64_image(payload), "YWJj")
 
 
 if __name__ == "__main__":

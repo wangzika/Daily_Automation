@@ -296,6 +296,21 @@ launchctl kickstart -k gui/$(id -u)/com.codex.daily-gnss-slam-digest
 ./scripts/generate_deepdives.sh draft
 ```
 
+论文解读配图还可以指定第二个参数：
+
+| 模式 | 用法 | 说明 |
+| --- | --- | --- |
+| `paper` | `./scripts/generate_deepdives.sh draft paper` | 只提取论文 PDF 原图，并按 `DEEPDIVE_FIGURE_KEYWORDS` 优先选择 framework、pipeline、overview、system、flow 等流程图或框架图 |
+| `ai` | `./scripts/generate_deepdives.sh draft ai` | 用 `GEMINI_API_KEY` 生成 16:9 概念主图，再搭配论文原图 |
+| `both` | `./scripts/generate_deepdives.sh draft both` | 同一篇论文生成原图版和 AI 版两份草稿，便于在公众号后台对比 |
+
+如果要让每日自动化默认生成两个版本，把 `.env` 改成：
+
+```env
+DEEPDIVE_IMAGE_MODE=both
+GEMINI_API_KEY=你的 Gemini Key
+```
+
 只生成本周热点汇总：
 
 ```bash

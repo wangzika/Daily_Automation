@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import html
 import json
 import os
 import re
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from datetime import date
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +33,7 @@ from .wechat import WeChatConfig, WeChatPublisher, WeChatPublisherError
 class DeepDiveFigure:
     path: Path
     caption: str
+    source: str = "paper"
 
 
 @dataclass(frozen=True)
@@ -72,107 +76,127 @@ def main(argv: list[str] | None = None) -> int:
         slug = _slugify(paper.get("arxiv_id") or paper["title"])
         paper_dir = args.output_dir / f"{index:02d}-{slug}"
         paper_dir.mkdir(parents=True, exist_ok=True)
+        variants = _image_variants(args.image_mode)
 
         pdf_path = paper_dir / "paper.pdf"
         _download(paper["pdf_url"], pdf_path)
 
         captions = _extract_figure_captions(pdf_path)
         reading = _build_reading(pdf_path, captions)
-        figures = _extract_figures(pdf_path, paper_dir, captions, max_figures=args.figures)
-        if not figures:
-            figures = _render_fallback_figures(pdf_path, paper_dir, max_figures=args.figures)
-        cover_figure = _select_cover_figure(figures)
-        figures = _move_cover_first(figures, cover_figure)
+        paper_figures = _extract_figures(
+            pdf_path,
+            paper_dir,
+            captions,
+            max_figures=args.figures,
+            figure_keywords=_split_keywords(args.figure_keywords),
+        )
+        fallback_figures: list[DeepDiveFigure] = []
+        if not paper_figures and "paper" in variants:
+            fallback_figures = _render_fallback_figures(pdf_path, paper_dir, max_figures=args.figures)
+        source_figures = paper_figures or fallback_figures
 
-        local_image_map = {f"figure_{i}": figure.path.name for i, figure in enumerate(figures, start=1)}
-        markdown = build_deepdive_markdown(paper, reading, figures, local_image_map)
-        html_text = build_deepdive_html(paper, reading, figures, local_image_map)
-
-        md_path = paper_dir / "article.md"
-        html_path = paper_dir / "article.html"
-        md_path.write_text(markdown, encoding="utf-8")
-        html_path.write_text(html_text, encoding="utf-8")
-        created.append(html_path)
-        print(f"Wrote deep dive: {html_path}")
-
-        if publisher and access_token:
-            cover_media_id = None
-            if cover_figure and os.getenv("DEEPDIVE_PAPER_COVER", "1").lower() not in {"0", "false", "no", "off"}:
-                try:
-                    cover_result = publisher.upload_permanent_image(access_token, cover_figure.path)
-                    cover_media_id = str(cover_result.get("media_id") or "")
-                    if cover_media_id:
-                        cover_media_ids.append(cover_media_id)
-                        print(f"Uploaded paper cover media_id: {cover_media_id}")
-                except WeChatPublisherError as exc:
-                    print(f"Paper cover upload failed, using default cover: {exc}", file=sys.stderr)
-            image_urls = {
-                f"figure_{i}": publisher.upload_article_image(access_token, figure.path)
-                for i, figure in enumerate(figures, start=1)
-            }
-            wechat_html = build_deepdive_html(paper, reading, figures, image_urls, include_title=False)
-            title = _wechat_title(paper)
-            media_id = publisher.add_draft(
-                access_token=access_token,
-                title=title,
-                content_html=wechat_html,
-                digest=_digest(paper),
-                content_source_url=paper.get("url"),
-                thumb_media_id=cover_media_id,
+        for variant in variants:
+            figures, cover_figure = _figures_for_variant(
+                variant=variant,
+                paper=paper,
+                reading=reading,
+                source_figures=source_figures,
+                output_dir=paper_dir,
+                max_figures=args.figures,
             )
-            draft_ids.append(media_id)
-            draft_email_items.append(
-                {
-                    "title": title,
-                    "media_id": media_id,
-                    "source_url": paper.get("url"),
-                    "html_path": html_path,
-                    "md_path": md_path,
-                }
-            )
-            print(f"Created WeChat deep-dive draft media_id: {media_id}")
-            if args.publish_mode == "publish":
-                if publish_blocked_reason:
-                    publish_results.append(
-                        {
-                            "media_id": media_id,
-                            "status": "draft_created_publish_skipped",
-                            "reason": publish_blocked_reason,
-                        }
-                    )
-                    print(f"Skipped publish submit for draft {media_id}: {publish_blocked_reason}", file=sys.stderr)
-                else:
+            if not figures:
+                print(f"No figures available for {variant} deep dive: {paper.get('title', '')}", file=sys.stderr)
+
+            local_image_map = {f"figure_{i}": figure.path.name for i, figure in enumerate(figures, start=1)}
+            markdown = build_deepdive_markdown(paper, reading, figures, local_image_map)
+            html_text = build_deepdive_html(paper, reading, figures, local_image_map)
+
+            article_stem = _article_stem(variant, variants)
+            md_path = paper_dir / f"{article_stem}.md"
+            html_path = paper_dir / f"{article_stem}.html"
+            md_path.write_text(markdown, encoding="utf-8")
+            html_path.write_text(html_text, encoding="utf-8")
+            created.append(html_path)
+            print(f"Wrote {variant} deep dive: {html_path}")
+
+            if publisher and access_token:
+                cover_media_id = None
+                if cover_figure and os.getenv("DEEPDIVE_PAPER_COVER", "1").lower() not in {"0", "false", "no", "off"}:
                     try:
-                        result = publisher.submit_publish(access_token, media_id)
-                        publish_results.append({"media_id": media_id, "status": "submitted", "result": result})
-                        print(f"Submitted WeChat publish request: {result}")
+                        cover_result = publisher.upload_permanent_image(access_token, cover_figure.path)
+                        cover_media_id = str(cover_result.get("media_id") or "")
+                        if cover_media_id:
+                            cover_media_ids.append(cover_media_id)
+                            print(f"Uploaded {variant} cover media_id: {cover_media_id}")
                     except WeChatPublisherError as exc:
-                        publish_failed = True
-                        reason = str(exc)
+                        print(f"{variant} cover upload failed, using default cover: {exc}", file=sys.stderr)
+                image_urls = {
+                    f"figure_{i}": publisher.upload_article_image(access_token, figure.path)
+                    for i, figure in enumerate(figures, start=1)
+                }
+                wechat_html = build_deepdive_html(paper, reading, figures, image_urls, include_title=False)
+                title = _wechat_title(paper, variant=variant if len(variants) > 1 else None)
+                media_id = publisher.add_draft(
+                    access_token=access_token,
+                    title=title,
+                    content_html=wechat_html,
+                    digest=_digest(paper),
+                    content_source_url=paper.get("url"),
+                    thumb_media_id=cover_media_id,
+                )
+                draft_ids.append(media_id)
+                draft_email_items.append(
+                    {
+                        "title": title,
+                        "media_id": media_id,
+                        "source_url": paper.get("url"),
+                        "html_path": html_path,
+                        "md_path": md_path,
+                    }
+                )
+                print(f"Created WeChat {variant} deep-dive draft media_id: {media_id}")
+                if args.publish_mode == "publish":
+                    if publish_blocked_reason:
                         publish_results.append(
                             {
                                 "media_id": media_id,
-                                "status": "draft_created_publish_failed",
-                                "reason": reason,
+                                "status": "draft_created_publish_skipped",
+                                "reason": publish_blocked_reason,
                             }
                         )
-                        print(f"WeChat publish submit failed after draft creation: {reason}", file=sys.stderr)
-                        print(
-                            describe_notification_result(
-                                notify_publish_issue(
-                                    article_type="单篇论文解读",
-                                    title=title,
-                                    media_id=media_id,
-                                    reason=reason,
+                        print(f"Skipped publish submit for draft {media_id}: {publish_blocked_reason}", file=sys.stderr)
+                    else:
+                        try:
+                            result = publisher.submit_publish(access_token, media_id)
+                            publish_results.append({"media_id": media_id, "status": "submitted", "result": result})
+                            print(f"Submitted WeChat publish request: {result}")
+                        except WeChatPublisherError as exc:
+                            publish_failed = True
+                            reason = str(exc)
+                            publish_results.append(
+                                {
+                                    "media_id": media_id,
+                                    "status": "draft_created_publish_failed",
+                                    "reason": reason,
+                                }
+                            )
+                            print(f"WeChat publish submit failed after draft creation: {reason}", file=sys.stderr)
+                            print(
+                                describe_notification_result(
+                                    notify_publish_issue(
+                                        article_type="单篇论文解读",
+                                        title=title,
+                                        media_id=media_id,
+                                        reason=reason,
+                                    )
                                 )
                             )
-                        )
-                        if _is_publish_unauthorized(reason):
-                            publish_blocked_reason = (
-                                "freepublish API unauthorized (errcode 48001); "
-                                "draft was kept and later articles will be saved as drafts"
-                            )
-                            print(publish_blocked_reason, file=sys.stderr)
+                            if _is_publish_unauthorized(reason):
+                                publish_blocked_reason = (
+                                    "freepublish API unauthorized (errcode 48001); "
+                                    "draft was kept and later articles will be saved as drafts"
+                                )
+                                print(publish_blocked_reason, file=sys.stderr)
 
     manifest = args.output_dir / f"{date.today().isoformat()}-deepdives.json"
     manifest.write_text(
@@ -289,7 +313,7 @@ def build_deepdive_markdown(
     ]
     for i, figure in enumerate(figures, start=1):
         key = f"figure_{i}"
-        figure_caption = _display_figure_caption(figure.caption, i)
+        figure_caption = _display_figure_caption(figure.caption, i, figure.source)
         lines.extend(
             [
                 f"![{figure_caption}]({image_map.get(key, figure.path.name)})",
@@ -309,7 +333,7 @@ def build_deepdive_markdown(
             "",
             *_markdown_bullets(_followup_questions(paper)),
             "",
-            "> 图像来自论文 PDF，仅用于论文解读和学术讨论，正式转载前建议核对论文许可和作者要求。",
+            f"> {_image_note(figures)}",
         ]
     )
     return "\n".join(lines).strip() + "\n"
@@ -353,7 +377,7 @@ def build_deepdive_html(
     for i, figure in enumerate(figures, start=1):
         key = f"figure_{i}"
         src = image_map.get(key, figure.path.name)
-        figure_caption = _display_figure_caption(figure.caption, i)
+        figure_caption = _display_figure_caption(figure.caption, i, figure.source)
         parts.extend(
             [
                 '<section style="margin:0 0 22px;padding:14px;border:1px solid #e1eeee;border-radius:10px;background:#ffffff;">',
@@ -369,11 +393,17 @@ def build_deepdive_html(
             _chapter_cards(chapters[2:], start=4),
             _section_title("读完之后可以追问"),
             _numbered_cards(_followup_questions(paper)),
-            '<p style="margin:22px 0 0;color:#8a9da3;font-size:12px;line-height:1.8;">图像来自论文 PDF，仅用于论文解读和学术讨论，正式转载前建议核对论文许可和作者要求。</p>',
+            f'<p style="margin:22px 0 0;color:#8a9da3;font-size:12px;line-height:1.8;">{html.escape(_image_note(figures))}</p>',
             "</section>",
         ]
     )
     return "".join(parts)
+
+
+def _image_note(figures: list[DeepDiveFigure]) -> str:
+    if any(figure.source == "ai" for figure in figures):
+        return "主图为辅助示意图，论文原图来自 PDF；图片仅用于论文解读和学术讨论，正式转载前建议核对论文许可和作者要求。"
+    return "图像来自论文 PDF，仅用于论文解读和学术讨论，正式转载前建议核对论文许可和作者要求。"
 
 
 def _download(url: str, output: Path) -> None:
@@ -475,7 +505,13 @@ def _extract_section(text: str, starts: tuple[str, ...], ends: tuple[str, ...], 
     return _clean_text(section)[:max_chars]
 
 
-def _extract_figures(pdf_path: Path, output_dir: Path, captions: list[str], max_figures: int) -> list[DeepDiveFigure]:
+def _extract_figures(
+    pdf_path: Path,
+    output_dir: Path,
+    captions: list[str],
+    max_figures: int,
+    figure_keywords: tuple[str, ...] = (),
+) -> list[DeepDiveFigure]:
     raw_dir = output_dir / "raw_images"
     raw_dir.mkdir(parents=True, exist_ok=True)
     prefix = raw_dir / "img"
@@ -484,8 +520,8 @@ def _extract_figures(pdf_path: Path, output_dir: Path, captions: list[str], max_
     except (OSError, subprocess.CalledProcessError):
         return []
 
-    candidates: list[tuple[int, Path, Image.Image]] = []
-    for path in sorted(raw_dir.iterdir()):
+    candidates: list[tuple[float, str, Path, Image.Image]] = []
+    for raw_index, path in enumerate(sorted(raw_dir.iterdir()), start=1):
         if path.suffix.lower() not in {".jpg", ".jpeg", ".ppm", ".png"}:
             continue
         try:
@@ -499,17 +535,16 @@ def _extract_figures(pdf_path: Path, output_dir: Path, captions: list[str], max_
             continue
         if _ink_ratio(image) < 0.015:
             continue
-        score = area
-        if 1.1 <= width / max(height, 1) <= 4.8:
-            score += 80_000
-        candidates.append((score, path, image))
+        caption = _caption_for(captions, raw_index)
+        score = _paper_figure_score(image, caption, figure_keywords)
+        candidates.append((score, caption, path, image))
 
     candidates.sort(key=lambda item: item[0], reverse=True)
     selected: list[DeepDiveFigure] = []
-    for i, (_score, _path, image) in enumerate(candidates[:max_figures], start=1):
+    for i, (_score, caption, _path, image) in enumerate(candidates[:max_figures], start=1):
         out = output_dir / f"figure-{i}.jpg"
         image.save(out, format="JPEG", quality=92, optimize=True, progressive=True)
-        selected.append(DeepDiveFigure(out, _caption_for(captions, i)))
+        selected.append(DeepDiveFigure(out, caption, source="paper"))
     return selected
 
 
@@ -529,7 +564,7 @@ def _render_fallback_figures(pdf_path: Path, output_dir: Path, max_figures: int)
         image.thumbnail((1200, 900))
         out = output_dir / f"figure-{i}.jpg"
         image.save(out, format="JPEG", quality=90, optimize=True, progressive=True)
-        figures.append(DeepDiveFigure(out, f"论文 PDF 第 {i} 页截图"))
+        figures.append(DeepDiveFigure(out, f"论文 PDF 第 {i} 页截图", source="pdf_page"))
     return figures
 
 
@@ -555,14 +590,70 @@ def _ink_ratio(image: Image.Image) -> float:
     return ink / max(len(pixels), 1)
 
 
+def _paper_figure_score(image: Image.Image, caption: str, figure_keywords: tuple[str, ...]) -> float:
+    width, height = image.size
+    ratio = width / max(height, 1)
+    area = width * height
+    score = min(area / 60_000, 35.0)
+    if 1.15 <= ratio <= 3.8:
+        score += 18.0
+    elif height > width * 1.18:
+        score -= 20.0
+    if _caption_keyword_hits(caption, figure_keywords):
+        score += 55.0
+    lowered = caption.lower()
+    if any(term in lowered for term in ("fig.", "figure", "图")):
+        score += 4.0
+    if any(term in lowered for term in ("table", "tab.", "表 ")):
+        score -= 12.0
+    return score
+
+
+def _caption_keyword_hits(caption: str, figure_keywords: tuple[str, ...] = ()) -> list[str]:
+    terms = figure_keywords or _default_figure_keywords()
+    lowered = caption.lower()
+    return [term for term in terms if term and term.lower() in lowered]
+
+
+def _default_figure_keywords() -> tuple[str, ...]:
+    return (
+        "framework",
+        "architecture",
+        "pipeline",
+        "overview",
+        "system",
+        "workflow",
+        "flow",
+        "schematic",
+        "block diagram",
+        "setup",
+        "experimental setup",
+        "method",
+        "network",
+        "infrastructure",
+        "proposed",
+        "框架",
+        "架构",
+        "流程",
+        "系统",
+        "结构",
+        "方法",
+        "实验设置",
+    )
+
+
 def _caption_for(captions: list[str], index: int) -> str:
     if 0 <= index - 1 < len(captions):
         return _clean_figure_caption(captions[index - 1])
     return f"论文原图 {index}（从 PDF 直接提取）"
 
 
-def _display_figure_caption(caption: str, display_index: int) -> str:
+def _display_figure_caption(caption: str, display_index: int, source: str = "paper") -> str:
     caption = _clean_figure_caption(caption)
+    if source == "ai":
+        body = _short_figure_caption_body(caption)
+        return f"主图：{body}" if body else "主图：方法流程概念图"
+    caption = _caption_without_figure_number(caption)
     match = re.match(r"^(?:Fig(?:ure)?\.?)\s*(\d+)\s*[.:]?\s*(.*)$", caption, re.IGNORECASE)
     prefix = "主图" if display_index == 1 else "论文图"
     if match:
@@ -576,6 +667,12 @@ def _clean_figure_caption(caption: str) -> str:
     caption = " ".join(caption.split())
     caption = re.sub(r"([A-Za-z])-\s+([a-z])", r"\1\2", caption)
     caption = caption.replace("ﬁ", "fi").replace("ﬂ", "fl")
+    return caption.strip()
+
+
+def _caption_without_figure_number(caption: str) -> str:
+    caption = re.sub(r"^\s*图\s*\d+\s*[.．:：、-]*\s*", "", caption)
+    caption = re.sub(r"^\s*(?:Fig(?:ure)?\.?)\s*\d+\s*[.:：、-]*\s*", "", caption, flags=re.IGNORECASE)
     return caption.strip()
 
 
@@ -605,6 +702,10 @@ def _move_cover_first(figures: list[DeepDiveFigure], cover: DeepDiveFigure | Non
 def _cover_score(figure: DeepDiveFigure) -> float:
     caption = figure.caption.lower()
     score = 0.0
+    if figure.source == "ai":
+        score += 120.0
+    elif figure.source == "pdf_page":
+        score -= 90.0
     for term in (
         "framework",
         "architecture",
@@ -640,6 +741,184 @@ def _cover_score(figure: DeepDiveFigure) -> float:
     if 500_000 <= area <= 2_800_000:
         score += 4.0
     return score
+
+
+def _image_variants(image_mode: str) -> tuple[str, ...]:
+    mode = (image_mode or "paper").strip().lower()
+    if mode == "both":
+        return ("paper", "ai")
+    if mode in {"paper", "ai"}:
+        return (mode,)
+    raise ValueError(f"Unsupported DEEPDIVE_IMAGE_MODE: {image_mode}")
+
+
+def _article_stem(variant: str, variants: tuple[str, ...]) -> str:
+    if len(variants) == 1:
+        return "article"
+    return f"article-{variant}"
+
+
+def _figures_for_variant(
+    *,
+    variant: str,
+    paper: dict[str, Any],
+    reading: PaperReading,
+    source_figures: list[DeepDiveFigure],
+    output_dir: Path,
+    max_figures: int,
+) -> tuple[list[DeepDiveFigure], DeepDiveFigure | None]:
+    if variant == "ai":
+        ai_cover = _generate_ai_cover_figure(paper, reading, output_dir)
+        if ai_cover:
+            remaining = max(max_figures - 1, 0)
+            figures = [ai_cover, *source_figures[:remaining]]
+            return figures, ai_cover
+        print("Gemini cover unavailable; AI version falls back to paper figures.", file=sys.stderr)
+
+    cover = _select_cover_figure(source_figures)
+    figures = _move_cover_first(source_figures, cover)[:max_figures]
+    return figures, cover
+
+
+def _generate_ai_cover_figure(paper: dict[str, Any], reading: PaperReading, output_dir: Path) -> DeepDiveFigure | None:
+    api_key = _first_env("GEMINI_API_KEY", "GOOGLE_API_KEY")
+    if not api_key:
+        print("Gemini cover skipped: set GEMINI_API_KEY in .env to enable AI image mode.", file=sys.stderr)
+        return None
+    try:
+        image_bytes = _request_gemini_cover_image(api_key, _gemini_cover_prompt(paper, reading))
+        output = output_dir / "ai-cover.jpg"
+        _save_cover_image(image_bytes, output)
+        return DeepDiveFigure(output, _ai_cover_caption(paper, reading), source="ai")
+    except (OSError, ValueError, RuntimeError, urllib.error.URLError) as exc:
+        print(f"Gemini cover skipped: {exc}", file=sys.stderr)
+        return None
+
+
+def _request_gemini_cover_image(api_key: str, prompt: str) -> bytes:
+    endpoint = os.getenv("GEMINI_IMAGE_ENDPOINT", "https://generativelanguage.googleapis.com/v1beta/interactions")
+    model = os.getenv("GEMINI_IMAGE_MODEL", os.getenv("DEEPDIVE_AI_COVER_MODEL", "gemini-3.1-flash-image"))
+    body = {
+        "model": model,
+        "input": [{"type": "text", "text": prompt}],
+        "response_format": {
+            "type": "image",
+            "mime_type": "image/jpeg",
+            "aspect_ratio": "16:9",
+            "image_size": os.getenv("GEMINI_IMAGE_SIZE", "1K"),
+        },
+    }
+    request = urllib.request.Request(
+        endpoint,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=float(os.getenv("GEMINI_IMAGE_TIMEOUT_SECONDS", "120"))) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"Gemini API HTTP {exc.code}: {detail}") from exc
+    image_data = _extract_base64_image(payload)
+    if not image_data:
+        raise RuntimeError("Gemini API response did not include image data")
+    return base64.b64decode(image_data)
+
+
+def _extract_base64_image(payload: Any) -> str:
+    if isinstance(payload, dict):
+        output_image = payload.get("output_image") or payload.get("outputImage")
+        if isinstance(output_image, dict):
+            data = output_image.get("data") or output_image.get("image_data") or output_image.get("imageData")
+            if isinstance(data, str):
+                return data
+        inline_data = payload.get("inlineData") or payload.get("inline_data")
+        if isinstance(inline_data, dict):
+            data = inline_data.get("data")
+            mime = inline_data.get("mimeType") or inline_data.get("mime_type") or ""
+            if isinstance(data, str) and str(mime).startswith("image/"):
+                return data
+        data = payload.get("data")
+        mime = payload.get("mimeType") or payload.get("mime_type") or ""
+        if isinstance(data, str) and str(mime).startswith("image/"):
+            return data
+        for value in payload.values():
+            found = _extract_base64_image(value)
+            if found:
+                return found
+    elif isinstance(payload, list):
+        for value in payload:
+            found = _extract_base64_image(value)
+            if found:
+                return found
+    return ""
+
+
+def _save_cover_image(image_bytes: bytes, output: Path) -> None:
+    with Image.open(BytesIO(image_bytes)) as image:
+        cover = image.convert("RGB")
+        cover = _crop_to_ratio(cover, 16 / 9)
+        cover = cover.resize((1280, 720), Image.Resampling.LANCZOS)
+        cover.save(output, format="JPEG", quality=92, optimize=True, progressive=True)
+
+
+def _crop_to_ratio(image: Image.Image, ratio: float) -> Image.Image:
+    width, height = image.size
+    current = width / max(height, 1)
+    if abs(current - ratio) < 0.01:
+        return image
+    if current > ratio:
+        new_width = int(height * ratio)
+        left = max((width - new_width) // 2, 0)
+        return image.crop((left, 0, left + new_width, height))
+    new_height = int(width / ratio)
+    top = max((height - new_height) // 2, 0)
+    return image.crop((0, top, width, top + new_height))
+
+
+def _gemini_cover_prompt(paper: dict[str, Any], reading: PaperReading) -> str:
+    profile = _domain_profile(paper, reading)
+    terms = ", ".join(_paper_terms(paper, reading)[:8])
+    return (
+        "Create a clean 16:9 editorial concept illustration for a Chinese technical paper-reading article. "
+        "Do not include readable text, captions, logos, watermarks, UI panels, equations, or fake paper pages. "
+        "Use a modern scientific style with clear visual hierarchy and realistic technical elements. "
+        f"Paper title: {_display_title(paper)}. "
+        f"Topic keywords: {terms}. "
+        f"Scene: {profile['scene']}. Problem: {profile['problem']}. "
+        f"Method idea: {profile['method']}. Evidence theme: {profile['experiment']}. "
+        "Show the idea as a data-flow story: sensors or signals on the left, processing/fusion/detection in the middle, "
+        "and localization, mapping, timing, or warning output on the right. "
+        "Prefer teal, white, graphite, and subtle satellite/robotics/navigation cues. "
+        "The image should feel like a professional magazine cover, not a screenshot."
+    )
+
+
+def _ai_cover_caption(paper: dict[str, Any], reading: PaperReading) -> str:
+    profile = _domain_profile(paper, reading)
+    return f"{profile['problem']}与{profile['method']}的概念示意"
+
+
+def _first_env(*names: str) -> str:
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value.strip()
+    return ""
+
+
+def _split_keywords(value: str | tuple[str, ...] | None) -> tuple[str, ...]:
+    if isinstance(value, tuple):
+        return tuple(item.strip() for item in value if item.strip())
+    if not value:
+        return _default_figure_keywords()
+    parts = re.split(r"[,，;；\n]+", value)
+    keywords = tuple(part.strip() for part in parts if part.strip())
+    return keywords or _default_figure_keywords()
 
 
 def _one_sentence(paper: dict[str, Any], reading: PaperReading | None = None) -> str:
@@ -833,6 +1112,17 @@ def _figure_reading(paper: dict[str, Any], reading: PaperReading, figure: DeepDi
     caption_terms = _paper_terms_from_text(caption)
     lowered = caption.lower()
     evidence = f"图注里的关键词是 {', '.join(caption_terms[:5])}。" if caption_terms else ""
+    if figure.source == "ai":
+        return (
+            f"这张主图是把论文的核心矛盾画成一条工程链路：左边是{profile['scene']}里的输入和扰动，"
+            f"中间是作者关注的{profile['method']}，右边落到{profile['engineering']}。"
+            "读正文时可以顺着这条链追问三件事：输入是否可靠，中间判断依据是什么，输出能否直接服务部署。"
+        )
+    if figure.source == "pdf_page":
+        return (
+            "这张图来自论文页面截图，只适合作为定位全文结构的索引。真正读方法和实验时，"
+            f"还是要回到正文里确认{profile['method']}用到了哪些观测，以及{profile['experiment']}如何证明效果。"
+        )
     if any(term in lowered for term in ("setup", "framework", "architecture", "system", "overview", "pipeline", "workflow", "flow")):
         return (
             f"这张图适合当作全文路线图：按“输入 -> {profile['method']} -> 输出”走一遍，"
@@ -854,8 +1144,8 @@ def _figure_reading(paper: dict[str, Any], reading: PaperReading, figure: DeepDi
         )
     if index == 1:
         return (
-            f"主图先用来建立文章地图：谁是输入，谁在中间处理，谁是输出。"
-            f"有了这条线，再读方法和实验就不会被模块名绕住。{evidence}"
+            f"这张主图先按数据流读：先找输入观测，再找{profile['method']}所在的位置，"
+            f"最后看它输出给{profile['engineering']}的是什么。{evidence}"
         )
     return f"这张图放在后面看细节：它要么补充实验对比，要么解释某个模块的内部变量。读的时候把它和{profile['experiment']}对应起来。{evidence}"
 
@@ -1325,19 +1615,28 @@ def _normalize_title(value: str) -> str:
     return title
 
 
-def _wechat_title(paper: dict[str, Any]) -> str:
+def _wechat_title(paper: dict[str, Any], *, variant: str | None = None) -> str:
     display_title = _display_title(paper)
     lowered = display_title.lower()
     if "jamming" in lowered and "agc" in lowered:
-        return "论文解读｜GNSS干扰检测：AGC与C/N0"
+        return _with_variant_suffix("论文解读｜GNSS干扰检测：AGC与C/N0", variant)
     if "lxd-slam" in lowered:
-        return "论文解读｜LXD-SLAM：32种传感器组合"
+        return _with_variant_suffix("论文解读｜LXD-SLAM：32种传感器组合", variant)
     if "self-supervised" in lowered and "geometry" in lowered:
-        return "论文解读｜LiDAR SLAM自监督几何推理"
+        return _with_variant_suffix("论文解读｜LiDAR SLAM自监督几何推理", variant)
     title = "论文解读｜" + display_title
+    title = _with_variant_suffix(title, variant)
     if len(title) <= 34:
         return title
     return title[:31].rstrip(" -:：,，") + "..."
+
+
+def _with_variant_suffix(title: str, variant: str | None) -> str:
+    if variant == "ai":
+        return f"{title}｜AI版"
+    if variant == "paper":
+        return f"{title}｜原图版"
+    return title
 
 
 def _digest(paper: dict[str, Any]) -> str:
@@ -1425,6 +1724,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-dir", default=Path("outputs/deepdives"), type=Path)
     parser.add_argument("--limit", default=3, type=int)
     parser.add_argument("--figures", default=2, type=int)
+    parser.add_argument(
+        "--image-mode",
+        choices=("paper", "ai", "both"),
+        default=os.getenv("DEEPDIVE_IMAGE_MODE", "paper"),
+        help="paper=use matched paper figures, ai=use a Gemini concept cover, both=write both versions.",
+    )
+    parser.add_argument(
+        "--figure-keywords",
+        default=os.getenv("DEEPDIVE_FIGURE_KEYWORDS", ",".join(_default_figure_keywords())),
+        help="Comma-separated caption keywords used to prioritize framework or flowchart-like paper figures.",
+    )
     parser.add_argument("--publish-mode", choices=("none", "draft", "publish"), default="none")
     return parser.parse_args(argv)
 

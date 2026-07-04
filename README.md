@@ -169,6 +169,14 @@ PYTHONPATH=src python scripts/upload_cover_to_wechat.py outputs/wechat-cover-gns
 
 论文解读会按“故事导读、章节讲解、方法拆解、图解、实验、局限、工程复现”展开；`DEEPDIVE_PAPER_COVER=1` 时，会优先从论文 PDF 里挑 framework / architecture / pipeline / system 等流程图或框架图作为公众号草稿封面，并把这张图放到正文主图位置。
 
+如果想同时对比两种配图方式，可以运行：
+
+```bash
+./scripts/generate_deepdives.sh none both
+```
+
+其中 `paper` 版本只使用论文原图，并按 `DEEPDIVE_FIGURE_KEYWORDS` 里的关键词优先匹配流程图、框架图、系统图；`ai` 版本会用 `GEMINI_API_KEY` 生成 16:9 概念主图，再保留少量论文原图辅助解读。默认模式由 `.env` 里的 `DEEPDIVE_IMAGE_MODE=paper|ai|both` 控制。
+
 确认草稿后也可以提交发布：
 
 ```bash

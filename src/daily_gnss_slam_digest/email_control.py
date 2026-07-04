@@ -387,6 +387,10 @@ def _deepdive_command(
         str(_command_int(command.deepdive_limit, env.get("DEEPDIVE_LIMIT"), 3)),
         "--figures",
         str(_command_int(None, env.get("DEEPDIVE_FIGURES"), 2)),
+        "--image-mode",
+        env.get("DEEPDIVE_IMAGE_MODE", "paper"),
+        "--figure-keywords",
+        env.get("DEEPDIVE_FIGURE_KEYWORDS", ""),
         "--publish-mode",
         command.mode,
     ]

@@ -10,6 +10,7 @@ work/
 outputs/logs/
 outputs/cache/
 outputs/deepdives-check/
+outputs/deepdives-variant-check/
 outputs/email_commands/processed_commands.json
 outputs/**/paper.pdf
 outputs/**/raw_images/
