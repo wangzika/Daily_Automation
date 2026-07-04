@@ -353,6 +353,12 @@ EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES=1
 EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES=0
 ```
 
+通知邮件默认会在末尾附上几组“论文指令”快捷模板，包括只生成总结、总结加解读、只解读一篇和生成周报。想关闭这块内容，可以在 `.env` 中设置：
+
+```bash
+EMAIL_NOTIFY_INCLUDE_QUICK_COMMANDS=0
+```
+
 ## 11. 邮件指令控制
 
 除了每日定时任务，也可以通过邮件临时指定关键词，让系统按当前方案生成一组定制论文推荐和论文解读。

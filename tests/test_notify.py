@@ -10,6 +10,7 @@ from daily_gnss_slam_digest.notify import (
     NotificationResult,
     notify_automation_summary,
     notify_draft_created,
+    quick_command_templates,
     wechat_backend_url,
 )
 
@@ -85,6 +86,27 @@ class EmailConfigTest(unittest.TestCase):
 
         self.assertTrue(result.sent)
         send.assert_called_once()
+        _subject, body = send.call_args.args
+        self.assertIn("【快捷指令】", body)
+        self.assertIn("主题：论文指令：只生成总结", body)
+
+    def test_quick_commands_can_be_disabled_for_plain_summary(self) -> None:
+        with patch.dict(os.environ, {"EMAIL_NOTIFY_INCLUDE_QUICK_COMMANDS": "0"}, clear=True):
+            with patch("daily_gnss_slam_digest.notify.EmailNotifier.send") as send:
+                send.return_value = NotificationResult(True)
+
+                notify_automation_summary(subject="Summary", lines=("done",))
+
+        _subject, body = send.call_args.args
+        self.assertNotIn("【快捷指令】", body)
+
+    def test_quick_command_templates_include_supported_modes(self) -> None:
+        text = quick_command_templates()
+
+        self.assertIn("任务：总结", text)
+        self.assertIn("任务：总结, 解读", text)
+        self.assertIn("任务：解读", text)
+        self.assertIn("任务：周报", text)
 
 
 if __name__ == "__main__":

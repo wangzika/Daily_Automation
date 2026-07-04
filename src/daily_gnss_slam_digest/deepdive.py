@@ -643,116 +643,77 @@ def _cover_score(figure: DeepDiveFigure) -> float:
 
 
 def _one_sentence(paper: dict[str, Any], reading: PaperReading | None = None) -> str:
-    terms = set(paper.get("matched_terms", []))
-    if {"spoofing", "jamming", "interference"} & terms:
-        return "这篇论文的核心是把 GNSS 干扰/欺骗从“信号异常”转成可观测、可检测、可比较的接收机状态变化，并比较 AGC、C/N0 等接收机内部观测量在检测任务中的价值。"
-    if {"fusion", "multi-sensor", "multimodal"} & terms:
-        return "这篇论文的核心是回答多传感器融合系统在 GNSS 受限、传感器退化或场景变化时，如何用可配置的观测组合维持稳定定位和一致建图。"
-    if {"slam", "odometry", "mapping"} & terms:
-        return "这篇论文的核心是把局部几何、匹配约束或地图表达做得更可靠，从而改进 SLAM/里程计在复杂几何、稀疏点云或退化场景下的状态估计。"
-    return "这篇论文适合从问题定义、观测设计、约束建模和工程可迁移性四个角度快速阅读。"
+    reading = reading or PaperReading("", "", "", "", "", ())
+    profile = _domain_profile(paper, reading)
+    facts = _paper_facts(paper, reading)
+    claim = facts.get("method") or facts.get("finding") or facts.get("problem")
+    if claim:
+        return (
+            f"这篇论文围绕{profile['actor']}遇到的“{profile['problem']}”展开，"
+            f"核心看点是{_claim_to_plain_chinese(claim, profile, 'method')}。"
+        )
+    return f"这篇论文值得按“{profile['problem']} -> {profile['method']} -> {profile['experiment']}”这条线读。"
 
 
 def _story_intro(paper: dict[str, Any], reading: PaperReading) -> str:
-    terms = set(paper.get("matched_terms", []))
+    profile = _domain_profile(paper, reading)
+    facts = _paper_facts(paper, reading)
     title = _display_title(paper)
-    if {"spoofing", "jamming", "interference"} & terms:
-        return (
-            f"可以把《{title}》想成一个“定位系统值班员”的故事：系统平时相信 GNSS，"
-            "但一旦有人开始干扰或欺骗，最终经纬度跳变往往已经是后果。作者想做的是把告警提前，"
-            "从接收机内部的 AGC、C/N0、检测量这些细小变化里，判断信号环境是不是开始不对劲。"
-            f"{_section_hint(reading.abstract, '摘要')}"
-        )
-    if {"fusion", "multi-sensor", "multimodal"} & terms:
-        return (
-            f"《{title}》讲的是一个多传感器团队协作的故事：LiDAR、相机、IMU、GNSS 各自都有长处，"
-            "也都会在某些场景里掉链子。论文关心的不是把传感器堆得越多越好，而是当某个传感器失效、"
-            "某段场景退化或 GNSS 不可靠时，系统还能不能用同一套逻辑继续定位和建图。"
-            f"{_section_hint(reading.abstract, '摘要')}"
-        )
+    opening = _claim_to_plain_chinese(facts.get("problem", ""), profile, "problem")
+    method = _claim_to_plain_chinese(facts.get("method", ""), profile, "method")
+    experiment = _claim_to_plain_chinese(facts.get("experiment", ""), profile, "experiment")
+    ending = _claim_to_plain_chinese(facts.get("finding", ""), profile, "finding")
     return (
-        f"《{title}》可以当成一个“机器人怎样不迷路”的故事：前端看到的是稀疏、嘈杂、动态的世界，"
-        "后端却需要输出连续、可信的轨迹和地图。作者把切入点放在几何表示、匹配约束和地图更新的稳定性上，"
-        "减少一个局部错误一路放大成全局漂移。"
-        f"{_section_hint(reading.abstract, '摘要')}"
+        f"读《{title}》时，可以先把主角放在{profile['scene']}里："
+        f"{opening}。作者接着把镜头推到做法上，重点是{method}。"
+        f"到了实验部分，证据会落在{experiment}。最后再回到工程问题：{ending}。"
+        f"这样读下来，论文就不是一堆模块名，而是一条从风险、动作、证据到落地边界的线。"
     )
 
 
 def _chapter_walkthrough(paper: dict[str, Any], reading: PaperReading) -> list[tuple[str, str, tuple[str, ...]]]:
-    terms = set(paper.get("matched_terms", []))
-    if {"spoofing", "jamming", "interference"} & terms:
-        fallback_intro = (
-            "这篇论文从铁路自动化定位讲起：GNSS 正被用于 ATO、移动闭塞、虚拟编组等安全相关场景，"
-            "但 jamming 和 spoofing 会在接收机完成定位解算前先污染信号环境。作者把问题前移到接收机观测层，"
-            "希望用 AGC 和 C/N0 这类在线可读状态量提前发现干扰。"
-        )
-        fallback_method = (
-            "方法路线很清楚：先构造线性 chirp 干扰，再和真实 GPS L1 回放信号合路，最后用 COTS 接收机同时记录 AGC gain 和 C/N0。"
-            "AGC 检测看前端增益是否低于无干扰基线阈值，C/N0 检测看多颗卫星的载噪比是否同步下跌；两条检测链再和已知干扰时间段对齐比较。"
-        )
-        fallback_exp = (
-            "实验把预录的铁路沿线 IQ 数据在 GPS L1 上回放，并在多个 30 秒干扰区间逐步提高 chirp 功率。"
-            "真正要看的不是曲线是否好看，而是每一段干扰开始后 AGC/C/N0 谁先响应、谁漏检、谁在恢复阶段产生误报。"
-        )
-        fallback_conclusion = "结论给出的边界也很实用：AGC 对输入功率变化敏感，C/N0 会受卫星几何、多路径和环境影响；两者最好组合成可信度，而不是单独承担完整性判断。"
-    elif {"fusion", "multi-sensor", "multimodal"} & terms:
-        fallback_intro = (
-            "LXD-SLAM 盯住的是机器人部署里的一个硬问题：平台上可能有 LiDAR、相机、IMU、轮速计、GNSS，"
-            "但不同机器人、不同任务、不同环境拿到的传感器组合并不一样。作者把 3D LiDAR 作为核心锚点，"
-            "再让其它模态以可插拔方式加入同一套估计和建图框架。"
-        )
-        fallback_method = (
-            "方法由三层咬合起来：前端用 IESKF 做统一状态估计，预测阶段按可用传感器选择 IMU、轮速计或恒速模型；"
-            "更新阶段以 LiDAR 点到 mesh 的距离为主约束，视觉可用时再加入重投影误差。地图层用多层 GP sub-mesh 表达连续表面，"
-            "后端再用 ESC、视觉 Bidirectional PnP、GNSS/odometry 约束放进混合位姿图，修正长期漂移。"
-        )
-        fallback_exp = (
-            "实验需要按传感器组合逐组读：作者声称最多支持 32 种组合，所以证据不只是一条最优轨迹，"
-            "而是不同配置下是否能接近或超过专用 SOTA，并且能实时输出全局一致的稠密 mesh。"
-        )
-        fallback_conclusion = "结论的价值在于把模块化、统一滤波、稠密 mesh 和多模态回环连到一起；边界也很明显，组合越灵活，对标定、同步、算力和地图维护的要求越高。"
-    else:
-        fallback_intro = (
-            "这篇论文从 LiDAR SLAM 的局部几何瓶颈切入：稀疏点云、低线数 LiDAR 和噪声会让手工估计的协方差、对应关系、表面结构变得不稳定，"
-            "前端一旦给出脏约束，后端轨迹和地图都会被拖偏。"
-        )
-        fallback_method = (
-            "方法把每个点看成一个带协方差的高斯分布，用神经模块预测局部几何，再用符号推理模块检查两类一致性："
-            "对应点残差是否能被协方差解释，协方差诱导出的位姿是否和 SLAM 记忆中的位姿一致。"
-            "随后把推理后的几何反馈给 SLAM，更新轨迹和对应关系，形成几何和轨迹互相修正的闭环。"
-        )
-        fallback_exp = (
-            "实验把 KITTI Sequence 00 降采样成 64、32、16 线 LiDAR 设置，用 VGICP 作为后端，比较原始点云和几何推理后点云。"
-            "读实验时要同时看 300 帧区间 RPE、全局配准成功率和稀疏输入下的收益，因为这决定它是否真的帮 SLAM 抗退化。"
-        )
-        fallback_conclusion = "结论把贡献收束到“无真值标签学习局部几何”上；限制也很清楚，训练时间、采样策略和停止准则还会影响它能否广泛接入工程系统。"
-
+    profile = _domain_profile(paper, reading)
+    facts = _paper_facts(paper, reading)
     return [
         (
-            "背景和问题：论文为什么值得读",
+            "背景和问题：先看矛盾从哪来",
             _section_narrative(
-                reading.introduction,
-                fallback_intro,
+                reading.introduction or _abstract_text(paper, reading),
+                profile,
+                "problem",
+                facts.get("problem", ""),
             ),
-            tuple([*_problem_context(paper, reading)[:2], *_research_questions(paper, reading)[:2]]),
+            tuple(_chapter_points(paper, reading, "problem", 4)),
         ),
         (
-            "方法拆解：作者真正搭了哪台机器",
-            _section_narrative(reading.method, fallback_method),
-            tuple(_method_points(paper, reading)),
-        ),
-        (
-            "实验验证：证据链是否站得住",
-            _section_narrative(reading.experiments, fallback_exp),
-            tuple(_experiment_points(paper, reading)),
-        ),
-        (
-            "贡献边界和复现：哪些能迁移，哪些要小心",
+            "方法拆解：把做法拆成输入、核心动作和输出",
             _section_narrative(
-                reading.conclusion,
-                fallback_conclusion,
+                reading.method or _abstract_text(paper, reading),
+                profile,
+                "method",
+                facts.get("method", ""),
             ),
-            tuple([*_contribution_and_limits(paper, reading), *_engineering_points(paper, reading)[:2]]),
+            tuple(_chapter_points(paper, reading, "method", 5)),
+        ),
+        (
+            "实验验证：看数据、场景和指标是否对得上问题",
+            _section_narrative(
+                reading.experiments or _abstract_text(paper, reading),
+                profile,
+                "experiment",
+                facts.get("experiment", ""),
+            ),
+            tuple(_chapter_points(paper, reading, "experiment", 5)),
+        ),
+        (
+            "贡献边界和复现：把亮点翻成工程判断",
+            _section_narrative(
+                reading.conclusion or _abstract_text(paper, reading),
+                profile,
+                "finding",
+                facts.get("finding", ""),
+            ),
+            tuple(_chapter_points(paper, reading, "finding", 4)),
         ),
     ]
 
@@ -787,265 +748,547 @@ def _chapter_cards(chapters: list[tuple[str, str, tuple[str, ...]]], start: int 
     return "".join(cards)
 
 
-def _section_narrative(section_text: str, fallback: str) -> str:
-    if not section_text:
-        return fallback
-    keywords = _keyword_hits(
-        section_text,
-        (
-            "GNSS",
-            "GPS",
-            "AGC",
-            "CNO",
-            "LiDAR",
-            "visual",
-            "camera",
-            "inertial",
-            "IMU",
-            "SLAM",
-            "odometry",
-            "mapping",
-            "detection",
-            "jamming",
-            "spoofing",
-            "fusion",
-            "robust",
-            "dataset",
-            "benchmark",
-            "experiment",
-        ),
+def _section_narrative(section_text: str, profile: dict[str, str], role: str, fallback_claim: str = "") -> str:
+    claim = fallback_claim or _pick_sentence(section_text, _role_terms(profile, role), role)
+    anchor = _claim_to_plain_chinese(claim, profile, role)
+    if role == "problem":
+        return (
+            f"这一节先给问题定边界：主角是{profile['actor']}，压力来自{profile['problem']}。"
+            f"{anchor}。读到这里要抓住两个变量：系统相信了什么输入，以及这个输入在什么条件下会失真。"
+        )
+    if role == "method":
+        return (
+            f"方法部分可以拆成三步：先确认输入数据，再看作者怎样构造{profile['method']}，"
+            f"最后看输出如何服务于{profile['engineering']}。{anchor}。"
+            "这一步要把每个模块和它消耗的观测量对上号。"
+        )
+    if role == "experiment":
+        return (
+            f"实验部分要回答“证据够不够”。这篇的证据应落在{profile['experiment']}。"
+            f"{anchor}。读表格和曲线时，把数据来源、对比对象、失败场景和指标单位放在一起看。"
+        )
+    return (
+        f"收束部分要看作者把贡献限定在哪里。对工程读者来说，关键不是记住一个新名字，"
+        f"而是判断它能否接到{profile['engineering']}。{anchor}。"
     )
-    keyword_text = f"文中这一段反复出现的线索是 {', '.join(keywords[:6])}。" if keywords else ""
-    if keyword_text:
-        return f"{fallback}{keyword_text}"
-    return fallback
-
-
-def _section_hint(section_text: str, label: str) -> str:
-    keywords = _keyword_hits(section_text, ("GNSS", "AGC", "CNO", "LiDAR", "visual", "inertial", "SLAM", "odometry", "mapping", "detection", "jamming", "spoofing", "fusion", "robust"))
-    if not keywords:
-        return ""
-    return f" 从{label}抽取到的线索看，后文会围绕 {', '.join(keywords[:5])} 展开。"
-
-
-def _problem_context(paper: dict[str, Any], reading: PaperReading) -> list[str]:
-    terms = set(paper.get("matched_terms", []))
-    title = _display_title(paper)
-    if {"spoofing", "jamming", "interference"} & terms:
-        return [
-            "GNSS 在铁路、无人系统和车载定位里常被当作全局位置来源，但它面对干扰、欺骗和遮挡时很脆弱；只看最终位置跳变，往往已经太晚。",
-            "这类论文真正关心的不是“能不能检测到一次异常”，而是能不能在低成本接收机和真实噪声背景下稳定地区分干扰、正常波动和接收机状态变化。",
-            _evidence_sentence(reading, "从论文线索看，作者把接收机内部观测量作为检测依据，而不是只依赖最终 PVT 结果。"),
-        ]
-    if {"fusion", "multi-sensor", "multimodal"} & terms:
-        return [
-            "多传感器融合的难点不是把 LiDAR、相机、IMU、GNSS 都接进系统，而是在不同场景下知道哪些观测可信、哪些观测应该降权或剔除。",
-            "GNSS 受限、几何退化、动态物体和跨会话环境变化都会破坏单一传感器假设，因此论文需要证明系统在这些不完美条件下仍能闭环工作。",
-            f"从题目《{title}》看，重点不只是单点精度，而是传感器组合、可配置性和大场景一致建图能力。",
-        ]
-    return [
-        "SLAM/里程计的老问题是：前端几何估计不稳定会一路传导到后端优化，最后表现为漂移、错配或地图撕裂。",
-        "复杂几何、低分辨率 LiDAR、稀疏区域和动态场景会让手工几何估计变得脆弱，因此作者往往试图让局部几何或匹配约束更可靠。",
-        f"从题目《{title}》看，这篇论文适合重点关注它如何定义局部几何、如何训练/估计，以及它是否真的改善 SLAM 轨迹和地图质量。",
-    ]
 
 
 def _source_clues(paper: dict[str, Any], reading: PaperReading) -> list[str]:
-    text = " ".join(part for part in (reading.abstract, reading.conclusion) if part)
-    terms = set(paper.get("matched_terms", []))
-    if not text:
-        return [
-            "这篇论文的机器可读文本结构不完整，因此解读主要依据题名、图表和论文元数据；正式引用实验结论前仍建议回到原文逐段核对。",
-            "阅读时可以先围绕图表建立主线，再回到方法和实验部分确认作者的变量定义、阈值和数据集设置。",
-        ]
-
-    keywords = _keyword_hits(text, ("GNSS", "AGC", "CNO", "LiDAR", "visual", "inertial", "SLAM", "odometry", "mapping", "detection", "jamming", "spoofing", "fusion", "robust"))
-    clues = []
-    if {"spoofing", "jamming", "interference"} & terms:
-        clues.append("原文开篇把问题放在 GNSS 完整性和交通自动化背景下，因此这不是单纯的信号处理实验，而是面向安全关键定位的异常检测问题。")
-        clues.append("文本线索显示作者关注接收机内部观测量和干扰检测之间的关系；读者应把 AGC/CNO 当作检测链路中的状态量，而不是普通曲线。")
-    elif {"fusion", "multi-sensor", "multimodal"} & terms:
-        clues.append("原文主线围绕多传感器融合的稳定定位展开；阅读时要追踪每个传感器提供的是先验、运动约束、几何约束还是全局约束。")
-        clues.append("如果论文强调 configurable、cross-session 或 dense mapping，就要额外关注系统在传感器缺失和场景变化下是否仍保持同一套估计逻辑。")
-    else:
-        clues.append("原文主线围绕 SLAM/里程计中的几何表达或估计稳定性展开；阅读时要把局部几何、匹配关系和后端优化联系起来看。")
-        clues.append("如果作者引入自监督、学习式几何或新地图表达，关键是看它最终如何影响轨迹误差、局部地图质量和退化场景鲁棒性。")
-
-    if keywords:
-        clues.append(f"从可抽取文本中反复出现的术语看，建议跟踪这些线索：{', '.join(keywords[:8])}。")
+    profile = _domain_profile(paper, reading)
+    facts = _paper_facts(paper, reading)
+    terms = _paper_terms(paper, reading)
+    clues = [
+        f"先圈题目里的关键词：{', '.join(terms[:8]) or _display_title(paper)}。它们把文章带到{profile['scene']}，后文要追的是{profile['problem']}。",
+        f"摘要给出的第一条线索是：{_claim_to_plain_chinese(facts.get('problem', ''), profile, 'problem')}。这决定了文章不是只看最终效果，而是在追踪问题怎样发生。",
+        f"第二条线索落在做法：{_claim_to_plain_chinese(facts.get('method', ''), profile, 'method')}。读方法时优先找输入、假设、核心运算和输出。",
+    ]
+    if reading.captions:
+        caption_terms = _paper_terms_from_text(" ".join(reading.captions))[:5]
+        if caption_terms:
+            clues.append(f"图注里反复出现 {', '.join(caption_terms)}，说明主图很可能承载了系统流程、实验设置或结果对比。")
+    quality = paper.get("quality_signals") or {}
+    if paper.get("code_url") or quality.get("code_signal"):
+        clues.append("这篇有代码或复现线索，读完方法后可以直接检查代码是否覆盖数据预处理、训练/检测和评估脚本。")
+    elif quality.get("dataset_signal"):
+        clues.append("这篇有数据集或 benchmark 线索，实验部分要重点看数据来源是否贴近真实部署场景。")
     return clues
 
 
-def _research_questions(paper: dict[str, Any], reading: PaperReading) -> list[str]:
-    terms = set(paper.get("matched_terms", []))
-    if {"spoofing", "jamming", "interference"} & terms:
-        return [
-            "AGC、C/N0 等接收机观测量能否比定位结果更早反映干扰？",
-            "在不同干扰强度和时间区间下，哪个检测器更敏感，哪个更容易漏检？",
-            "如果把检测结果接入多传感器定位系统，能否作为 GNSS 观测权重或完整性标志使用？",
-        ]
-    if {"fusion", "multi-sensor", "multimodal"} & terms:
-        return [
-            "系统能否在不同传感器组合下保持同一套估计框架，而不是为每种组合重写一套管线？",
-            "LiDAR、视觉、IMU、GNSS 在前端或后端分别提供什么约束，失效时如何降级？",
-            "论文的实验是否覆盖大尺度、退化、跨会话或 GNSS 受限场景，而不只是理想数据集？",
-        ]
-    return [
-        "局部几何到底如何被表示：协方差、平面、曲率、对应关系，还是可学习的几何特征？",
-        "这种表示如何进入 SLAM：影响点云匹配、残差权重、后端约束，还是地图更新？",
-        "实验是否证明它改善了轨迹精度、收敛速度和退化场景稳定性，而不是只在可视化上更好看？",
-    ]
+def _chapter_points(paper: dict[str, Any], reading: PaperReading, role: str, limit: int) -> list[str]:
+    profile = _domain_profile(paper, reading)
+    source = _section_source(paper, reading, role)
 
+    claims = _select_sentences(source, _role_terms(profile, role), limit)
+    labels = {
+        "problem": ("场景压力", "失效来源", "作者抓住的变量", "这对定位系统的影响"),
+        "method": ("输入/观测", "核心步骤", "模型或检测量", "输出形式", "接入方式"),
+        "experiment": ("数据来源", "实验场景", "对比指标", "结果读法", "失败边界"),
+        "finding": ("主要贡献", "适用条件", "工程收益", "需要复核的边界"),
+    }[role]
 
-def _method_points(paper: dict[str, Any], reading: PaperReading) -> list[str]:
-    terms = set(paper.get("matched_terms", []))
-    if {"spoofing", "jamming", "interference"} & terms:
-        return [
-            "信号链路：用 SNCF 铁路沿线预录 IQ 数据回放 GPS L1，再把线性 chirp 干扰通过 RF combiner 合进去，让干扰发生时间和强度都可控。",
-            "接收机观测：Septentrio AsteRx SBi3 同步输出 MeasEpoch 里的 C/N0 和 ReceiverStatus 里的 AGC gain，避免只看最终经纬度跳变。",
-            "AGC 检测：先用无干扰样本估计均值和标准差，再用 `mu_ref - 3 sigma_ref - T_drop` 构造阈值；文中 `T_drop=2 dB`，观测值跌破阈值就触发告警。",
-            "C/N0 检测：看多颗卫星的 C/N0 是否同时低于预设阈值；这条链对真实信号质量更直观，但在弱干扰和恢复阶段更容易受跟踪环路影响。",
-            "工程接入：这套方法最适合输出 GNSS 可信度分数，再交给 INS/视觉/LiDAR 融合后端调协方差或剔除观测。",
-        ]
-    if {"fusion", "multi-sensor", "multimodal"} & terms:
-        return [
-            "可配置输入：系统以 3D LiDAR 为核心，额外支持 Camera、IMU、Wheel Encoder、GNSS；五类模态构成 power set，因此标题里的组合数是 32。",
-            "预测层：IESKF 的预测不是固定公式，IMU 可用时优先做高频传播，轮速计可用时提供地面平台运动先验，都缺失时退回恒速模型。",
-            "更新层：LiDAR 点云不再只做点到平面，而是和多层 GP sub-mesh 做 point-to-mesh 约束；相机可用时，光流跟踪的成熟特征再贡献重投影误差。",
-            "地图层：环境被拆成局部 sub-mesh，每个网格可拟合多层 Gaussian Process 表面，这让系统既能做稠密 mesh，也能给视觉特征做 ray-to-mesh 深度恢复。",
-            "后端层：ESC 描述子负责 LiDAR 拓扑回环，Bidirectional PnP 负责视觉回环，GNSS 和 odometry 约束一起进入混合位姿图，目标是同时修轨迹和修地图。",
-        ]
-    return [
-        "几何表示：每个 LiDAR 点被看成 3D Gaussian，协方差描述局部表面形状；稀疏点云里，协方差比单个点坐标更能表达“这个点附近像不像一片稳定表面”。",
-        "自监督来源：模型不用真值位姿或 dense geometry 标签，而是用对应点残差和 SLAM 估计轨迹之间的一致性来训练局部协方差。",
-        "推理模块：对应 likelihood 检查点对残差能否被协方差解释；pose likelihood 检查由协方差诱导出的位姿是否贴近记忆中的 SLAM 位姿。",
-        "反馈闭环：训练出的 covariance estimator 会把高各向异性的点用于采样增密，增密点云再送进 SLAM 后端更新轨迹和对应关系。",
-        "工程价值：它不是替换整个 SLAM，而是作为几何增强模块插到现有 LiDAR SLAM 前端，让低线数或稀疏输入更接近高质量几何约束。",
-    ]
-
-
-def _experiment_points(paper: dict[str, Any], reading: PaperReading) -> list[str]:
-    terms = set(paper.get("matched_terms", []))
-    if {"spoofing", "jamming", "interference"} & terms:
-        return [
-            "实验数据来自铁路场景 IQ 回放，接收端连续记录 30 分钟；每个 chirp 干扰区间持续 30 秒，并且后续区间功率逐步增加 5 dB。",
-            "AGC 曲线要看“跌落是否覆盖所有干扰段”：论文结果里 AGC-based detector 覆盖 7/7 个干扰区间，说明它对输入功率变化非常敏感。",
-            "C/N0 曲线要看“弱干扰是否漏掉”：CNO-based detector 检出 5/7 个区间，低功率的前两个区间没有稳定触发。",
-            "指标要同时看检出率和误报：表格给出 AGC 检测概率 100%、误报 0%；C/N0 检测概率约 76.5%、误报约 23%。",
-            "结论不能简单写成 AGC 完胜，因为 AGC 会受温度和前端状态影响，C/N0 会受卫星几何、多路径、跟踪恢复过程影响；组合判断才更接近工程完整性监测。",
-        ]
-    if {"fusion", "multi-sensor", "multimodal"} & terms:
-        return [
-            "第一层证据是组合覆盖：LXD-SLAM 不是只展示 LiDAR+IMU 的最强配置，而是要证明 LiDAR+X 的多种配置能共用同一估计框架。",
-            "第二层证据是对标专用系统：如果某个固定组合已经有成熟 SOTA，LXD-SLAM 至少要在精度上接近它，否则“统一框架”会牺牲性能。",
-            "第三层证据是地图质量：论文强调 dense mesh，就不能只看 ATE/RPE，还要看 mesh 是否连续、是否重影、回环后局部结构有没有撕裂。",
-            "第四层证据是实时性：GP sub-mesh、视觉 ray tracing、ESC、混合位姿图都很重，读实验时要留意帧率、内存和大场景增长趋势。",
-            "第五层证据是退化场景：长隧道、开阔地、窄视场 LiDAR、GNSS 受限和视觉贫纹理，才真正考验可配置融合是否有意义。",
-        ]
-    return [
-        "数据设置很克制：作者用 KITTI odometry Sequence 00，把原始 64 线点云降采样成 32 线和 16 线，专门观察稀疏输入下几何推理是否有价值。",
-        "后端不是作者重写的庞大系统，而是轻量 VGICP；这能说明模块更像一个可插拔几何增强层，而不是依赖特定后端的整套工程。",
-        "里程计指标用 300 帧区间 translational RPE。结果显示 16 线和 32 线在 2-step 后误差分别下降约 49.5% 和 47.8%，64 线只下降约 6.0%，说明收益主要来自稀疏场景。",
-        "全局配准用 TEASER，随机采 100 对距离 10m 内的扫描对，成功条件是旋转误差小于 10 度、平移误差小于 2m。",
-        "配准结果也符合直觉：32 线在 1-step 时成功率提升约 6.7%，64 线本来几何就足够好，后续提升更有限。",
-    ]
-
-
-def _contribution_and_limits(paper: dict[str, Any], reading: PaperReading) -> list[str]:
-    terms = set(paper.get("matched_terms", []))
-    if {"spoofing", "jamming", "interference"} & terms:
-        return [
-            "贡献：把 GNSS 干扰检测落到接收机可观测量上，使检测逻辑更接近真实系统可以在线获取的数据。",
-            "贡献：通过不同检测器对比，帮助判断 AGC 与 C/N0 在低功率和强干扰下的适用边界。",
-            "局限：如果干扰类型、接收机型号、天线环境变化，阈值和检测规律可能需要重新标定。",
-            "局限：检测到干扰不等于完成鲁棒定位，还需要和 INS/视觉/LiDAR 等融合模块共同决定 GNSS 权重。",
-        ]
-    if {"fusion", "multi-sensor", "multimodal"} & terms:
-        return [
-            "贡献：把多种传感器约束放到统一定位/建图框架里，降低了单一传感器退化带来的系统风险。",
-            "贡献：如果系统支持多种组合，就更接近真实平台，因为工程现场经常会遇到某个传感器缺失或质量下降。",
-            "局限：多模态系统高度依赖同步和标定，论文指标好不代表部署后也能稳定复现。",
-            "局限：dense mapping 或大尺度建图可能带来显著计算和存储成本，需要看实时性边界。",
-        ]
-    return [
-        "贡献：围绕局部几何或地图表达改进 SLAM 的关键薄弱环节，有助于减少前端错误向后端传播。",
-        "贡献：如果实验包含消融和退化场景，说明方法不只是调参，而是在机制上提高了鲁棒性。",
-        "局限：局部几何方法高度依赖点云密度、传感器噪声和场景结构，跨平台迁移需要重新验证。",
-        "局限：如果训练或参数选择依赖特定数据集，部署到新城市、新建筑或低成本雷达时可能退化。",
-    ]
-
-
-def _engineering_points(paper: dict[str, Any], reading: PaperReading) -> list[str]:
-    terms = set(paper.get("matched_terms", []))
-    if {"spoofing", "jamming", "interference"} & terms:
-        return [
-            "复现第一步：记录原始 GNSS 观测和接收机状态量，不要只保存最终经纬度。",
-            "复现第二步：把干扰/异常区间标注出来，分别评估 AGC、C/N0、残差和定位跳变的响应。",
-            "工程接入：把检测结果输出为 GNSS 可信度分数，用来调整融合定位里的观测协方差或剔除策略。",
-            "上线前检查：不同接收机、不同天线、不同城市环境都要重新校准阈值，避免把遮挡误判为攻击。",
-        ]
-    if {"fusion", "multi-sensor", "multimodal"} & terms:
-        return [
-            "复现第一步：先搭最小可运行组合，例如 LiDAR+IMU 或 VIO，再逐步加入 GNSS/视觉/热成像等额外观测。",
-            "复现第二步：建立传感器质量监控，记录同步误差、外参漂移、观测残差和异常剔除比例。",
-            "工程接入：不要把 GNSS 当作永远正确的全局约束，而应把它和干扰检测、完整性监测一起接入。",
-            "上线前检查：设计传感器失效实验，例如遮挡相机、降低 LiDAR 特征、模拟 GNSS 跳变，看系统能否优雅降级。",
-        ]
-    return [
-        "复现第一步：确认论文新增模块位于前端、后端还是地图表达层，避免把整个系统一次性重写。",
-        "复现第二步：先在公开数据集上复现轨迹指标，再看局部地图和失败案例，不要只看平均误差。",
-        "工程接入：如果模块只改变局部几何或权重，可以优先做成可插拔前端，而不是侵入整个 SLAM 后端。",
-        "上线前检查：用低纹理、稀疏点云、动态物体和闭环失败场景做压力测试。",
-    ]
+    points: list[str] = []
+    for label, claim in zip(labels, claims):
+        points.append(f"{label}：{_point_from_claim(label, claim, profile, role)}。")
+    while len(points) < min(limit, len(labels)):
+        label = labels[len(points)]
+        points.append(f"{label}：{_fallback_point(profile, role, label, source)}。")
+    return points
 
 
 def _followup_questions(paper: dict[str, Any]) -> list[str]:
-    terms = set(paper.get("matched_terms", []))
-    if {"spoofing", "jamming", "interference"} & terms:
-        return [
-            "如果攻击不是线性 chirp，而是更隐蔽的 spoofing 或 meaconing，指标是否仍然敏感？",
-            "检测器能否输出连续可信度，而不是只输出 0/1 告警？",
-            "和 IMU、视觉、LiDAR 融合后，GNSS 异常检测应该在前端、后端还是完整性监测层处理？",
-        ]
-    if {"fusion", "multi-sensor", "multimodal"} & terms:
-        return [
-            "哪一个传感器失效时系统最脆弱，论文有没有给出清晰的降级路径？",
-            "标定误差和时间同步误差对结果影响有多大？",
-            "如果换成低成本传感器或更大规模地图，计算和存储是否还能接受？",
-        ]
+    reading = PaperReading(str(paper.get("abstract") or ""), "", "", "", "", ())
+    profile = _domain_profile(paper, reading)
+    terms = _paper_terms(paper, reading)
+    first_term = terms[0] if terms else profile["actor"]
     return [
-        "新增几何模块在极端稀疏或动态场景中是否仍有效？",
-        "它提升的是前端匹配质量，还是后端优化的稳定性？",
-        "如果不使用作者的数据集和参数，方法是否仍能泛化？",
+        f"如果把 {first_term} 换到自己的机器人或车辆平台，最先需要重新标定的是输入数据、阈值，还是传感器外参？",
+        f"论文里的证据是否覆盖了{profile['scene']}里最容易失败的场景，还是只证明了一个受控设置？",
+        f"这套做法接入{profile['engineering']}时，应该输出连续可信度、离散告警，还是直接改变优化权重？",
     ]
 
 
 def _figure_reading(paper: dict[str, Any], reading: PaperReading, figure: DeepDiveFigure, index: int) -> str:
-    caption = figure.caption.lower()
-    terms = set(paper.get("matched_terms", []))
-    if "setup" in caption or "framework" in caption or "architecture" in caption or "system" in caption or "overview" in caption or "pipeline" in caption:
-        return "这张图适合当作论文的“主地图”来读：左侧是传感器或数据输入，中间是同步、融合、检测、建图或优化模块，右侧是定位、地图或告警输出。读它时不要急着看细节，先沿着箭头走一遍数据流，就能知道作者到底把创新点放在前端观测、后端优化，还是系统组织方式上。"
-    if "chirp" in caption or "time-frequency" in caption or "time frequency" in caption:
-        return "这张图不是最终检测结果，而是在说明干扰信号本身长什么样：频率会随时间扫过接收机关注的频段。读它时要把它当成后面 AGC/C/N0 异常的“起因”，先理解攻击输入，再看接收机内部观测量如何响应。"
-    if {"spoofing", "jamming", "interference"} & terms:
-        if index == 1:
-            return "把这张图当成“观测量响应图”来读：干扰发生时，接收机前端的 AGC、C/N0 或检测量会出现同步变化。阅读重点不是曲线本身，而是变化是否清晰、是否和干扰区间对齐、弱干扰时是否仍能被看见。"
-        return "第二张图更接近“检测结果图”或“对比图”：重点比较不同检测器在同一时间轴上的响应差异，尤其是低功率干扰是否漏检、强干扰是否稳定触发。"
-    if {"fusion", "multi-sensor", "multimodal"} & terms:
-        if index == 1:
-            return "这类图展示大场景重建、轨迹或系统输出。读图时先看地图是否连续、轨迹是否闭合，再看它是否体现多传感器融合带来的稳定性，而不是只看视觉效果是否漂亮。"
-        return "第二张图适合看对比和细节：不同传感器组合、不同场景或不同退化条件下，系统是否还能保持地图一致和定位稳定。"
-    if {"slam", "odometry", "mapping"} & terms:
-        if index == 1:
-            return "这张图是在解释几何建模或约束构造。读图时先分清输入点、局部几何、对应关系和位姿变换分别是什么，再看这些量如何进入 SLAM 前端或后端。"
-        return "这张图更适合看结果验证：轨迹是否贴近真值、迭代是否收敛、地图或局部结构是否因为新模块变得更稳定。"
-    if "agc" in caption or "cno" in caption or "detection" in caption:
-        return "读这张图时不要只看曲线是否变化，而要把变化和干扰发生区间对齐：AGC 的突降、C/N0 的下降或检测脉冲，分别代表接收机前端增益控制、卫星信号质量和检测器输出。真正有价值的是弱干扰下谁先响应、谁漏检。"
-    if "map" in caption or "mapping" in caption or "trajectory" in caption or "odometry" in caption:
-        return "这类图要同时看轨迹和地图：轨迹是否闭合、地图是否重影、转弯和长走廊是否漂移。漂亮的可视化不等于鲁棒，最好结合数值指标和失败案例一起判断。"
+    profile = _domain_profile(paper, reading)
+    caption = figure.caption
+    caption_terms = _paper_terms_from_text(caption)
+    lowered = caption.lower()
+    evidence = f"图注里的关键词是 {', '.join(caption_terms[:5])}。" if caption_terms else ""
+    if any(term in lowered for term in ("setup", "framework", "architecture", "system", "overview", "pipeline", "workflow", "flow")):
+        return (
+            f"这张图适合当作全文路线图：按“输入 -> {profile['method']} -> 输出”走一遍，"
+            f"就能看清作者把创新放在观测、模型、检测还是优化环节。{evidence}"
+        )
+    if any(term in lowered for term in ("experiment", "evaluation", "result", "performance", "benchmark", "table")):
+        return (
+            f"这张图要和实验段落一起读：先确认数据来自哪里，再看指标怎样衡量{profile['problem']}是否被缓解。"
+            f"{evidence}曲线或柱状图最有价值的地方，是能不能解释强弱场景、失败样本和对比方法之间的差异。"
+        )
+    if any(term in lowered for term in ("map", "mapping", "trajectory", "odometry", "localization", "pose")):
+        return (
+            f"这张图在展示定位或建图结果。先看轨迹连续性、地图重影、回环前后变化，再回到正文确认这些变化由哪些观测支撑。{evidence}"
+        )
+    if any(term in lowered for term in ("gnss", "gps", "spoof", "jamming", "interference", "timing", "signal")):
+        return (
+            f"这张图围绕信号或时间轴展开。读图时把异常输入、接收机状态和最终告警连起来，"
+            f"看作者是否把{profile['problem']}从现象拆成了可测量的变量。{evidence}"
+        )
     if index == 1:
-        return "先把这张图当成系统结构图看：输入是什么、核心模块在哪里、输出怎样被用于检测或定位，是判断论文能否迁移的第一步。"
-    return "这张图更适合看实验验证逻辑：关注曲线或模块之间的差异，而不是只看作者给出的结论。"
+        return (
+            f"主图先用来建立文章地图：谁是输入，谁在中间处理，谁是输出。"
+            f"有了这条线，再读方法和实验就不会被模块名绕住。{evidence}"
+        )
+    return f"这张图放在后面看细节：它要么补充实验对比，要么解释某个模块的内部变量。读的时候把它和{profile['experiment']}对应起来。{evidence}"
+
+
+def _domain_profile(paper: dict[str, Any], reading: PaperReading) -> dict[str, str]:
+    text = _combined_text(paper, reading).lower()
+    terms = set(str(term).lower() for term in paper.get("matched_terms", []))
+    if terms & {"spoofing", "jamming", "interference", "integrity", "pnt"} or any(
+        token in text for token in ("gnss", "gps", "spoof", "jamming", "interference", "pnt", "timing protection")
+    ):
+        return {
+            "actor": "GNSS/PNT 接收机以及依赖它的车辆、机器人或授时系统",
+            "scene": "开放环境里的定位、导航和授时链路",
+            "problem": "外部信号可能被伪造、压制或缓慢拉偏，系统却还会输出看似可信的位置或时间",
+            "method": "接收机观测、攻击构造、检测统计量、保护级或轻量模型",
+            "experiment": "真实设备、回放信号、公开攻击数据、误报漏报、时间误差或部署算力",
+            "engineering": "GNSS 可信度评估、融合定位降权、告警策略和完整性监测",
+        }
+    if any(token in text for token in ("slam", "odometry", "mapping", "lidar", "imu", "visual", "camera", "3dgs", "gaussian")):
+        return {
+            "actor": "移动机器人定位与建图系统",
+            "scene": "室内外移动机器人、自动驾驶或大尺度建图场景",
+            "problem": "单一传感器会在遮挡、稀疏几何、动态物体或长距离运行中失去稳定约束",
+            "method": "传感器融合、几何约束、地图表达、回环检测或学习式前端",
+            "experiment": "轨迹误差、地图一致性、传感器退化、跨数据集对比和实时性",
+            "engineering": "SLAM 前端/后端、地图维护、传感器降级和部署算力预算",
+        }
+    if any(token in text for token in ("navigation", "planning", "embodied", "language", "policy", "manipulation")):
+        return {
+            "actor": "需要把感知、决策和行动连起来的机器人",
+            "scene": "真实或仿真的自主导航、任务执行和人机交互场景",
+            "problem": "高层任务描述和底层运动控制之间存在语义、几何和安全约束的落差",
+            "method": "视觉语言模型、策略学习、地图记忆、路径规划或任务分解",
+            "experiment": "任务成功率、泛化场景、交互成本、失败恢复和真实平台验证",
+            "engineering": "机器人任务规划、在线决策、可解释失败分析和安全约束",
+        }
+    return {
+        "actor": "定位、感知或机器人系统",
+        "scene": "复杂真实场景中的自主系统部署",
+        "problem": "观测存在噪声、缺失或分布变化，系统仍要输出可信结果",
+        "method": "问题建模、观测设计、算法约束和实验验证",
+        "experiment": "数据来源、对比基线、指标定义、消融实验和失败案例",
+        "engineering": "可复现实现、参数标定、部署成本和风险控制",
+    }
+
+
+def _paper_facts(paper: dict[str, Any], reading: PaperReading) -> dict[str, str]:
+    abstract = _abstract_text(paper, reading)
+    profile = _domain_profile(paper, reading)
+    return {
+        "problem": _pick_sentence(
+            _section_source(paper, reading, "problem"),
+            ("challenge", "problem", "threat", "exposed", "difficult", "risk", "limited", "robust", "vulnerable"),
+            "problem",
+        ),
+        "method": _pick_sentence(
+            _section_source(paper, reading, "method"),
+            ("propose", "present", "introduce", "develop", "investigate", "approach", "pipeline", "framework", "model", "monitor", "search"),
+            "method",
+        ),
+        "experiment": _pick_sentence(
+            _section_source(paper, reading, "experiment"),
+            ("experiment", "evaluate", "validated", "dataset", "benchmark", "results", "tested", "calibrated", "simulation"),
+            "experiment",
+        ),
+        "finding": _pick_sentence(
+            _section_source(paper, reading, "finding"),
+            ("show", "demonstrate", "result", "improve", "outperform", "contribution", "provide", "open source", "susceptible"),
+            "finding",
+        )
+        or f"{profile['method']}最终要服务于{profile['engineering']}",
+    }
+
+
+def _claim_to_plain_chinese(claim: str, profile: dict[str, str], role: str) -> str:
+    evidence = _evidence_summary(claim)
+    if role == "problem":
+        base = f"{profile['actor']}面对的核心风险是{profile['problem']}"
+    elif role == "method":
+        base = f"方法主线是围绕{profile['method']}把输入、处理和输出连起来"
+    elif role == "experiment":
+        base = f"实验主线是用{profile['experiment']}验证问题是否真的被触碰到"
+    else:
+        base = f"结论要落到{profile['engineering']}"
+    return f"{base}；{evidence}" if evidence else base
+
+
+def _point_from_claim(label: str, claim: str, profile: dict[str, str], role: str) -> str:
+    evidence = _evidence_summary(claim)
+    if role == "problem":
+        if label == "场景压力":
+            return f"{evidence}，说明论文把问题放在{profile['scene']}里看，定位结果会继续影响后续通信、控制或授时"
+        if label == "失效来源":
+            return f"{evidence}，危险点在于输入被污染后，{profile['actor']}仍可能给出像正常一样的输出"
+        if label == "作者抓住的变量":
+            return f"{evidence}，这就是后文要反复跟踪的观测量、攻击参数或系统状态"
+        return f"{evidence}，影响会从单个观测扩散到{profile['engineering']}"
+    if role == "method":
+        if label == "输入/观测":
+            return f"{evidence}，先确认这些输入是实测、回放、仿真，还是由模型生成"
+        if label == "核心步骤":
+            return f"{evidence}，把这些步骤按时间顺序串起来，就是论文的主处理链"
+        if label == "模型或检测量":
+            return f"{evidence}，读到这里要分清哪些是可测变量，哪些是作者构造出的判断量"
+        if label == "输出形式":
+            return f"{evidence}，输出必须能被后续模块消费，才有机会接入{profile['engineering']}"
+        return f"{evidence}，工程接入时要明确它改变告警、权重、地图还是控制决策"
+    if role == "experiment":
+        if label == "数据来源":
+            return f"{evidence}，先看数据来自真实设备、公开数据集还是仿真环境"
+        if label == "实验场景":
+            return f"{evidence}，场景越贴近{profile['scene']}，结论越值得迁移"
+        if label == "对比指标":
+            return f"{evidence}，这里要看指标是否直接对应{profile['problem']}"
+        if label == "结果读法":
+            return f"{evidence}，重点不是单个数值好看，而是强弱场景和失败样本能否解释得通"
+        return f"{evidence}，这些边界决定方法换平台后要重新标定什么"
+    if label == "主要贡献":
+        return f"{evidence}，贡献要回到{profile['engineering']}才有工程价值"
+    if label == "适用条件":
+        return f"{evidence}，这些条件决定论文结论能不能迁移到自己的传感器和场景"
+    if label == "工程收益":
+        return f"{evidence}，真正的收益是减少误信、漂移、漏检或计算开销"
+    return f"{evidence}，复现时要优先检查数据、参数、同步和评价脚本"
+
+
+def _fallback_point(profile: dict[str, str], role: str, label: str, source: str = "") -> str:
+    details = _detail_tokens(source)
+    numbers = _numbers_and_units(source)
+    if role == "problem":
+        if details:
+            return f"围绕 {', '.join(details[:4])}，把{profile['problem']}拆成可观察的输入变化"
+        return f"围绕{profile['actor']}，把{profile['problem']}拆成可观察的输入变化"
+    if role == "method":
+        if label == "核心步骤" and details:
+            return f"把 {', '.join(details[:5])} 串成流程，确认每一步的输入和输出"
+        if label == "模型或检测量" and details:
+            return f"重点跟踪 {', '.join(details[:5])}，看它们是观测量、模型模块还是实验设备"
+        if label == "输出形式":
+            return f"输出要能回到{profile['engineering']}，否则方法只停留在离线演示"
+        if label == "接入方式":
+            return f"把结果接到{profile['engineering']}时，要明确它改变的是告警、权重、地图还是控制决策"
+        return f"检查{profile['method']}分别消耗什么输入、产生什么中间量、怎样输出给后续模块"
+    if role == "experiment":
+        if numbers:
+            return f"数字线索包括 {', '.join(numbers[:5])}，先看这些数字对应场景强度、速度、误差还是算力"
+        if details:
+            return f"围绕 {', '.join(details[:5])} 复核数据来源、测试平台和对比对象"
+        return f"把{profile['experiment']}和论文声称要解决的问题逐项对齐"
+    if details:
+        return f"把 {', '.join(details[:4])} 放回{profile['engineering']}，判断它是否能进入自己的系统"
+    return f"把{label}落回{profile['engineering']}，判断它是否能进入自己的系统"
+
+
+def _evidence_summary(claim: str) -> str:
+    details = _detail_tokens(claim)
+    numbers = _numbers_and_units(claim)
+    if details and numbers:
+        return f"线索落在 {', '.join(details[:4])}，数字包括 {', '.join(numbers[:4])}"
+    if details:
+        return f"线索落在 {', '.join(details[:5])}"
+    if numbers:
+        return f"数字线索包括 {', '.join(numbers[:5])}"
+    phrase = _short_evidence(claim, max_words=16)
+    return f"短句线索是 {phrase}" if phrase else "这一段给出的证据需要回到原文细读"
+
+
+def _abstract_text(paper: dict[str, Any], reading: PaperReading) -> str:
+    return str(paper.get("abstract") or "") or reading.abstract
+
+
+def _section_source(paper: dict[str, Any], reading: PaperReading, role: str) -> str:
+    abstract = _abstract_text(paper, reading)
+    if role == "problem":
+        candidate = reading.introduction
+    elif role == "method":
+        candidate = reading.method
+    elif role == "experiment":
+        candidate = reading.experiments
+    else:
+        candidate = reading.conclusion
+    if not candidate or _section_is_noisy(candidate):
+        return abstract
+    if abstract and abstract not in candidate:
+        return f"{candidate} {abstract}"
+    return candidate
+
+
+def _section_is_noisy(text: str) -> bool:
+    lowered = text.lower()
+    if any(token in lowered[:800] for token in ("arxiv:", "funded by", "copyright", "personal use of this material")):
+        return True
+    sentences = _sentence_candidates(text)
+    return len(sentences) < 2 and len(text) > 350
+
+
+def _combined_text(paper: dict[str, Any], reading: PaperReading) -> str:
+    return " ".join(
+        part
+        for part in (
+            str(paper.get("title") or ""),
+            str(paper.get("abstract") or ""),
+            reading.abstract,
+            reading.introduction,
+            reading.method,
+            reading.experiments,
+            reading.conclusion,
+            " ".join(reading.captions),
+            " ".join(str(term) for term in paper.get("matched_terms", [])),
+        )
+        if part
+    )
+
+
+def _paper_terms(paper: dict[str, Any], reading: PaperReading) -> list[str]:
+    candidates = [str(term) for term in paper.get("matched_terms", [])]
+    candidates.extend(_paper_terms_from_text(_combined_text(paper, reading)))
+    seen: dict[str, str] = {}
+    for term in candidates:
+        clean = term.strip()
+        if not clean:
+            continue
+        key = clean.lower()
+        seen.setdefault(key, clean if clean.isupper() else _canonical_term(clean))
+    return list(seen.values())
+
+
+def _paper_terms_from_text(text: str) -> list[str]:
+    candidates = (
+        "GNSS",
+        "GPS",
+        "PNT",
+        "SLAM",
+        "LiDAR",
+        "IMU",
+        "VIO",
+        "C/N0",
+        "AGC",
+        "SDR",
+        "V2X",
+        "3DGS",
+        "spoofing",
+        "jamming",
+        "interference",
+        "integrity",
+        "timing",
+        "localization",
+        "navigation",
+        "mapping",
+        "odometry",
+        "fusion",
+        "visual",
+        "camera",
+        "robot",
+        "planning",
+        "benchmark",
+        "dataset",
+        "open source",
+        "quantization",
+        "pruning",
+        "architecture search",
+    )
+    return _keyword_hits(text, candidates)
+
+
+def _canonical_term(term: str) -> str:
+    mapping = {
+        "gnss": "GNSS",
+        "gps": "GPS",
+        "pnt": "PNT",
+        "slam": "SLAM",
+        "lidar": "LiDAR",
+        "imu": "IMU",
+        "vio": "VIO",
+        "cno": "C/N0",
+        "c/n0": "C/N0",
+        "agc": "AGC",
+        "sdr": "SDR",
+        "v2x": "V2X",
+        "3dgs": "3DGS",
+    }
+    return mapping.get(term.lower(), term)
+
+
+def _role_terms(profile: dict[str, str], role: str) -> tuple[str, ...]:
+    common = tuple(_paper_terms_from_text(" ".join(profile.values())))
+    if role == "problem":
+        return common + ("challenge", "problem", "threat", "risk", "vulnerable", "degradation", "failure", "noise", "attack")
+    if role == "method":
+        return common + ("propose", "present", "method", "framework", "pipeline", "algorithm", "model", "monitor", "estimator", "search")
+    if role == "experiment":
+        return common + ("experiment", "evaluation", "dataset", "benchmark", "result", "validated", "tested", "simulation", "metric")
+    return common + ("contribution", "show", "demonstrate", "improve", "outperform", "limitation", "future", "open source")
+
+
+def _pick_sentence(text: str, include: tuple[str, ...] = (), role: str = "") -> str:
+    selected = _select_sentences(text, include, 1, role=role)
+    return selected[0] if selected else ""
+
+
+def _select_sentences(text: str, include: tuple[str, ...], limit: int, *, role: str = "") -> list[str]:
+    candidates = _sentence_candidates(text)
+    if not candidates:
+        return []
+    scored = []
+    include_lower = tuple(item.lower() for item in include if item)
+    for position, sentence in enumerate(candidates):
+        lowered = sentence.lower()
+        score = max(0, 8 - position)
+        score += sum(4 for term in include_lower if term in lowered)
+        if re.search(r"\d", sentence):
+            score += 3
+        if any(token in lowered for token in ("we ", "this paper", "our ", "propose", "present", "introduce", "show", "demonstrate")):
+            score += 3
+        if role == "experiment" and any(token in lowered for token in ("experiment", "dataset", "benchmark", "result", "validated", "tested")):
+            score += 6
+        if role == "method" and any(token in lowered for token in ("propose", "pipeline", "framework", "model", "method", "algorithm")):
+            score += 6
+        scored.append((score, position, sentence))
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    selected: list[str] = []
+    seen_phrases: set[str] = set()
+    for _score, _position, sentence in scored:
+        key = _short_evidence(sentence, max_words=10).lower()
+        if key in seen_phrases:
+            continue
+        seen_phrases.add(key)
+        selected.append(sentence)
+        if len(selected) >= limit:
+            break
+    return selected
+
+
+def _sentence_candidates(text: str) -> list[str]:
+    clean = _clean_text(text)
+    if not clean:
+        return []
+    pieces = re.split(r"(?<=[.!?。！？])\s+", clean)
+    candidates: list[str] = []
+    for piece in pieces:
+        sentence = piece.strip(" -")
+        if not sentence:
+            continue
+        if len(sentence) < 45 and not re.search(r"\d", sentence):
+            continue
+        if len(sentence) > 420:
+            sentence = sentence[:420].rsplit(" ", 1)[0].rstrip(" ,;:") + "."
+        lowered = sentence.lower()
+        if lowered.startswith(("references", "acknowledg", "copyright")):
+            continue
+        if any(token in lowered for token in ("arxiv:", "funded by", "personal use of this material")):
+            continue
+        if re.match(r"^\d+\s+figure\s+\d+", lowered):
+            continue
+        if lowered.count("[") >= 3 and len(sentence) < 260:
+            continue
+        candidates.append(sentence)
+    return candidates
+
+
+def _short_evidence(text: str, max_words: int = 22, max_chars: int = 132) -> str:
+    text = _clean_text(text)
+    if not text:
+        return ""
+    words = text.split()
+    if len(words) > max_words:
+        text = " ".join(words[:max_words]).rstrip(" ,;:-") + "..."
+    if len(text) > max_chars:
+        text = text[: max_chars - 3].rstrip(" ,;:-") + "..."
+    return text
+
+
+def _numbers_and_units(text: str) -> list[str]:
+    patterns = (
+        r"\b\d+(?:\.\d+)?\s?(?:km/h|m/s|ms|ns|s|dB|Hz|kHz|MHz|GHz|m|km|%|x)\b",
+        r"\b\d+/\d+\b",
+        r"\b\d+(?:\.\d+)?\s?(?:pages|figures|tables|scenarios|devices)\b",
+    )
+    values: list[str] = []
+    for pattern in patterns:
+        values.extend(match.group(0) for match in re.finditer(pattern, text, flags=re.IGNORECASE))
+    return list(dict.fromkeys(values))
+
+
+def _detail_tokens(text: str) -> list[str]:
+    tokens = _paper_terms_from_text(text)
+    tokens.extend(
+        match.group(0).strip()
+        for match in re.finditer(r"\b[A-Z][A-Za-z0-9/+.-]{2,}(?:\s+[A-Z][A-Za-z0-9/+.-]{2,}){0,2}\b", text)
+    )
+    for phrase in (
+        "Haversine distance",
+        "temporal discretization",
+        "linear interpolation",
+        "baseband signal",
+        "coordinate generation",
+        "architecture search",
+        "structured pruning",
+        "static quantization",
+        "raw pseudoranges",
+        "broadcast ephemeris",
+        "cross-satellite consistency",
+    ):
+        if phrase.lower() in text.lower():
+            tokens.append(phrase)
+    cleaned: dict[str, str] = {}
+    stop_terms = {
+        "the",
+        "this",
+        "under",
+        "within",
+        "both",
+        "first",
+        "second",
+        "third",
+        "yet",
+        "it",
+        "future work the",
+        "future work",
+        "and future work the",
+        "controlled testbench",
+        "common attack pattern",
+    }
+    for token in tokens:
+        token = token.strip(" ,.;:()[]")
+        token = re.sub(r"\s+", " ", token)
+        token = re.sub(r"\b(The|This|Under|Within|Both)$", "", token).strip()
+        if token.lower() in stop_terms:
+            continue
+        if len(token) < 3:
+            continue
+        cleaned.setdefault(token.lower(), _canonical_term(token))
+    return list(cleaned.values())
 
 
 def _authors(paper: dict[str, Any]) -> str:

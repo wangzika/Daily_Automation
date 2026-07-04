@@ -187,7 +187,7 @@ PYTHONPATH=src python scripts/upload_cover_to_wechat.py outputs/wechat-cover-gns
 ./scripts/daily_automation.sh
 ```
 
-脚本带有运行锁，避免定时任务重叠执行；定时总控默认只发送最后一封总结邮件，邮件只保留成功/失败、步骤耗时、公众号草稿箱、GitHub commit 和日志路径，失败时才附少量日志摘录。
+脚本带有运行锁，避免定时任务重叠执行；定时总控默认只发送最后一封总结邮件，邮件只保留成功/失败、步骤耗时、公众号草稿箱、GitHub commit 和日志路径，失败时才附少量日志摘录。通知邮件末尾会附上可直接复制的“论文指令”快捷模板；如果觉得邮件太长，可把 `EMAIL_NOTIFY_INCLUDE_QUICK_COMMANDS=0`。
 
 `.env` 中可以配置：
 
@@ -197,6 +197,7 @@ AUTOMATION_PYTHON=
 AUTOMATION_WECHAT_MODE=draft
 AUTOMATION_DEEPDIVE_MODE=draft
 AUTOMATION_LOG_TAIL_LINES=60
+EMAIL_NOTIFY_INCLUDE_QUICK_COMMANDS=1
 WEEKLY_SUMMARY_ENABLED=1
 WEEKLY_SUMMARY_DAY=7
 WEEKLY_SUMMARY_DAYS=7

@@ -166,6 +166,7 @@ def notify_draft_created(
     lines.extend(extra_lines)
     lines.append("")
     lines.append("请到公众号后台草稿箱检查排版、封面和图片后再发布。")
+    _append_quick_commands(lines)
     return EmailNotifier().send(f"公众号草稿已创建｜{title[:36]}", "\n".join(lines))
 
 
@@ -195,7 +196,9 @@ def notify_publish_issue(
 
 
 def notify_automation_summary(*, subject: str, lines: Iterable[str]) -> NotificationResult:
-    return EmailNotifier().send(subject, "\n".join(lines))
+    body_lines = list(lines)
+    _append_quick_commands(body_lines)
+    return EmailNotifier().send(subject, "\n".join(body_lines))
 
 
 def describe_notification_result(result: NotificationResult) -> str:
@@ -210,6 +213,52 @@ def wechat_backend_url() -> str:
 
 def step_notifications_suppressed() -> bool:
     return _bool_env("EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES", False)
+
+
+def quick_command_templates() -> str:
+    return "\n".join(
+        [
+            "【快捷指令】",
+            "把下面任意一段作为新邮件正文发送给自己，主题包含“论文指令”即可触发。",
+            "",
+            "1. 只生成每日论文总结",
+            "主题：论文指令：只生成总结",
+            "关键词：GNSS spoofing detection, robust localization",
+            "任务：总结",
+            "模式：draft",
+            "数量：5",
+            "检索天数：180",
+            "",
+            "2. 生成总结 + 论文解读",
+            "主题：论文指令：总结和解读",
+            "关键词：3DGS SLAM, LiDAR inertial odometry, neural mapping",
+            "任务：总结, 解读",
+            "模式：draft",
+            "数量：5",
+            "解读数量：2",
+            "检索天数：180",
+            "",
+            "3. 只生成一篇重点论文解读",
+            "主题：论文指令：只解读论文",
+            "关键词：GNSS timing spoofing protection level",
+            "任务：解读",
+            "模式：draft",
+            "数量：3",
+            "解读数量：1",
+            "",
+            "4. 生成周报",
+            "主题：论文指令：周报",
+            "关键词：robotics navigation localization SLAM manipulation",
+            "任务：周报",
+            "模式：none",
+        ]
+    )
+
+
+def _append_quick_commands(lines: list[str]) -> None:
+    if not _bool_env("EMAIL_NOTIFY_INCLUDE_QUICK_COMMANDS", True):
+        return
+    lines.extend(["", quick_command_templates()])
 
 
 def main(argv: list[str] | None = None) -> int:
