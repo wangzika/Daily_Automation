@@ -14,13 +14,16 @@ def build_markdown(
     recommendations: list[RecommendedPaper],
     issue_date: date,
     image_paths: Mapping[str, str] | None = None,
+    focus_topic: str = "",
 ) -> str:
     title = build_title(issue_date)
     image_paths = image_paths or {}
+    focus_topic = focus_topic or "GNSS 欺骗/干扰检测、多模态融合定位、SLAM 与鲁棒里程计"
+    suggested_terms = _suggested_terms_for_focus(focus_topic)
     lines: list[str] = [
         f"# {title}",
         "",
-        "今天的推荐聚焦三个交叉点：GNSS 欺骗/干扰检测、多模态融合定位、SLAM 与鲁棒里程计。筛选逻辑优先考虑主题相关性、新近度、引用/venue/开源代码等质量信号，以及是否能给工程系统带来可验证的思路。",
+        f"今天的轮换主题是：**{focus_topic}**。筛选逻辑优先考虑主题相关性、新近度、引用/venue/开源代码等质量信号，以及是否能给工程系统带来可验证的思路。",
         "",
         "## 筛选方法论",
         "",
@@ -73,7 +76,7 @@ def build_markdown(
             "",
             "## 明日检索关键词",
             "",
-            "`GNSS spoofing detection`、`PNT integrity`、`LiDAR-Inertial-Visual-GNSS`、`degeneracy-aware odometry`、`multimodal SLAM`、`factor graph fusion`。",
+            "、".join(f"`{term}`" for term in suggested_terms) + "。",
             "",
             "> 本文基于公开论文元数据生成，建议阅读原文后再引用具体实验结论。",
         ]
@@ -85,17 +88,19 @@ def build_html(
     recommendations: list[RecommendedPaper],
     issue_date: date,
     image_urls: Mapping[str, str] | None = None,
+    focus_topic: str = "",
 ) -> str:
     title = build_title(issue_date)
     image_urls = image_urls or {}
+    focus_topic = focus_topic or "GNSS 欺骗/干扰检测、多模态融合定位、SLAM 与鲁棒里程计"
+    suggested_terms = _suggested_terms_for_focus(focus_topic)
 
     body_parts: list[str] = [
         (
             '<section style="margin:0 0 20px;padding:18px 18px 16px;'
             'border-left:4px solid #25d8b8;background:#f5fbfa;color:#24343a;'
             'line-height:1.85;font-size:15px;">'
-            "今天的推荐聚焦 <strong>GNSS 欺骗/干扰检测</strong>、"
-            "<strong>多模态融合定位</strong>、<strong>SLAM 与鲁棒里程计</strong>。"
+            f"今天的轮换主题是 <strong>{html.escape(focus_topic)}</strong>。"
             "筛选逻辑优先考虑主题相关性、新近度、引用/venue/开源代码等质量信号，"
             "以及是否能给工程系统带来可验证的思路。"
             "</section>"
@@ -132,7 +137,7 @@ def build_html(
             _section_title("今日观察"),
             _callout("GNSS 相关论文正在从单点接收机检测走向跨传感器、跨平台和时空一致性验证；SLAM 方向则越来越强调在退化、动态和大尺度场景下的恢复能力。对自动驾驶、无人机和机器人系统来说，下一步值得重点关注的是：把 GNSS 完整性监测放进状态估计闭环，而不是只把它当成后处理告警。"),
             _section_title("明日检索关键词"),
-            _tag_line(("GNSS spoofing detection", "PNT integrity", "LiDAR-Inertial-Visual-GNSS", "degeneracy-aware odometry", "multimodal SLAM", "factor graph fusion")),
+            _tag_line(suggested_terms),
             '<p style="margin:22px 0 0;color:#8a9da3;font-size:13px;line-height:1.8;">本文基于公开论文元数据生成，建议阅读原文后再引用具体实验结论。</p>',
         ]
     )
@@ -151,6 +156,7 @@ def write_outputs(
     issue_date: date,
     output_dir: Path,
     image_paths: Mapping[str, str] | None = None,
+    focus_topic: str = "",
 ) -> dict[str, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = f"{issue_date.isoformat()}-gnss-slam-digest"
@@ -158,8 +164,14 @@ def write_outputs(
     html_path = output_dir / f"{stem}.html"
     json_path = output_dir / f"{stem}.json"
 
-    markdown_path.write_text(build_markdown(recommendations, issue_date, image_paths=image_paths), encoding="utf-8")
-    html_path.write_text(build_html(recommendations, issue_date, image_urls=image_paths), encoding="utf-8")
+    markdown_path.write_text(
+        build_markdown(recommendations, issue_date, image_paths=image_paths, focus_topic=focus_topic),
+        encoding="utf-8",
+    )
+    html_path.write_text(
+        build_html(recommendations, issue_date, image_urls=image_paths, focus_topic=focus_topic),
+        encoding="utf-8",
+    )
     json_path.write_text(_to_json(recommendations), encoding="utf-8")
 
     return {"markdown": markdown_path, "html": html_path, "json": json_path}
@@ -169,11 +181,12 @@ def build_title(issue_date: date) -> str:
     return f"{PROJECT_TITLE} | {issue_date.isoformat()}"
 
 
-def build_digest(recommendations: list[RecommendedPaper]) -> str:
+def build_digest(recommendations: list[RecommendedPaper], focus_topic: str = "") -> str:
     if not recommendations:
         return "今日未检索到足够相关的新论文，建议扩大检索窗口。"
     first = recommendations[0].paper.title
-    return f"今日精选 {len(recommendations)} 篇 GNSS 欺骗检测、多模态融合与 SLAM 相关论文，重点推荐：{first}"
+    topic_text = focus_topic or "GNSS 欺骗检测、多模态融合与 SLAM"
+    return f"今日围绕 {topic_text} 精选 {len(recommendations)} 篇相关论文，重点推荐：{first}"
 
 
 def _format_authors(authors: tuple[str, ...]) -> str:
@@ -186,6 +199,99 @@ def _format_authors(authors: tuple[str, ...]) -> str:
 
 def _format_terms(terms: tuple[str, ...]) -> str:
     return "、".join(terms[:10]) if terms else "GNSS、fusion、SLAM"
+
+
+def _suggested_terms_for_focus(focus_topic: str) -> tuple[str, ...]:
+    presets: tuple[tuple[str, tuple[str, ...]], ...] = (
+        (
+            "具身导航",
+            (
+                "embodied navigation",
+                "vision-language navigation",
+                "object navigation",
+                "navigation foundation model",
+                "mobile robot policy",
+                "VLM navigation",
+            ),
+        ),
+        (
+            "3DGS",
+            (
+                "Gaussian Splatting SLAM",
+                "3D Gaussian Splatting mapping",
+                "NeRF SLAM",
+                "neural implicit SLAM",
+                "dense visual SLAM",
+                "real-time reconstruction",
+            ),
+        ),
+        (
+            "开放词汇",
+            (
+                "open vocabulary mapping",
+                "semantic mapping",
+                "language-guided navigation",
+                "object goal navigation",
+                "scene graph SLAM",
+                "3D semantic map",
+            ),
+        ),
+        (
+            "地点识别",
+            (
+                "visual place recognition",
+                "LiDAR place recognition",
+                "loop closure",
+                "long-term localization",
+                "cross-modal place recognition",
+                "re-localization",
+            ),
+        ),
+        (
+            "多机器人",
+            (
+                "multi-robot SLAM",
+                "collaborative SLAM",
+                "distributed mapping",
+                "cooperative localization",
+                "communication-efficient SLAM",
+                "multi-agent localization",
+            ),
+        ),
+        (
+            "韧性 PNT",
+            (
+                "resilient PNT",
+                "GNSS spoofing detection",
+                "GNSS jamming detection",
+                "PNT integrity",
+                "OSNMA",
+                "GNSS denied localization",
+            ),
+        ),
+        (
+            "退化场景",
+            (
+                "robust odometry",
+                "LiDAR-inertial odometry",
+                "visual-inertial odometry",
+                "factor graph fusion",
+                "degeneracy-aware odometry",
+                "sensor degradation",
+            ),
+        ),
+    )
+    for needle, terms in presets:
+        if needle in focus_topic:
+            return terms
+    return (
+        "GNSS spoofing detection",
+        "PNT integrity",
+        "LiDAR-Inertial-Visual-GNSS",
+        "degeneracy-aware odometry",
+        "multimodal SLAM",
+        "factor graph fusion",
+    )
 
 
 def _quality_summary(item: RecommendedPaper) -> str:

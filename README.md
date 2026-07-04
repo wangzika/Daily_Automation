@@ -173,6 +173,7 @@ AUTOMATION_LOG_TAIL_LINES=60
 WEEKLY_SUMMARY_ENABLED=1
 WEEKLY_SUMMARY_DAY=7
 WEEKLY_SUMMARY_DAYS=7
+TOPIC_ROTATION_ENABLED=on
 GITHUB_REPO_URL=git@github.com:your-name/your-repo.git
 GITHUB_BRANCH=master
 GIT_AUTHOR_NAME="GNSS Paper Bot"
@@ -228,7 +229,7 @@ GIT_AUTHOR_EMAIL=your@email.com
 ./scripts/generate_weekly_summary.sh
 ```
 
-周报会写入 `outputs/weekly/`，内容包括热点方向、高频关键词、有代码/复现线索、venue/引用线索和本周最值得追的论文。
+周报会写入 `outputs/weekly/`，内容包括热点方向、机器人领域热点雷达、高频关键词、有代码/复现线索、venue/引用线索和本周最值得追的论文。
 
 在 macOS 上安装每日定时任务：
 
@@ -244,11 +245,25 @@ launchctl kickstart -k gui/$(id -u)/com.codex.daily-gnss-slam-digest
 
 ## 查询主题
 
-默认覆盖三组主题：
+默认开启 `TOPIC_ROTATION_ENABLED=on`，没有邮件关键词时按星期轮换 7 个导航定位热点主题：
 
-- GNSS spoofing/jamming detection: 欺骗、干扰、PNT 完整性、异常检测。
-- Multimodal fusion: LiDAR/visual/inertial/GNSS、多传感器融合、紧耦合估计。
-- SLAM and odometry: SLAM、VIO/LIO/LIVO、回环、建图、定位。
+| 星期 | 主题 |
+| --- | --- |
+| 周一 | 具身导航与机器人基础模型 |
+| 周二 | 3DGS/NeRF 神经场 SLAM |
+| 周三 | 开放词汇语义地图与语言导航 |
+| 周四 | 地点识别与长期定位 |
+| 周五 | 多机器人协同 SLAM 与分布式建图 |
+| 周六 | 韧性 PNT 与 GNSS 抗欺骗抗干扰 |
+| 周日 | 退化场景多模态融合与鲁棒里程计 |
+
+如果当天轮换主题没有强匹配论文，脚本会自动退回到七日热点主题池做补位检索，避免日报空跑。邮件指令里的 `关键词` 优先级最高；只要你通过邮件指定关键词，就不会使用当天轮换主题。
+
+如果想回到旧的综合检索：
+
+```bash
+TOPIC_ROTATION_ENABLED=off
+```
 
 可在命令行调整窗口和推荐数量：
 

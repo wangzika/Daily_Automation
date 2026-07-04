@@ -166,7 +166,46 @@ WEEKLY_SUMMARY_DAY=5
 WEEKLY_SUMMARY_ENABLED=0
 ```
 
-## 6. 如何修改每日运行时间
+## 6. 每日论文主题轮换
+
+默认开启：
+
+```bash
+TOPIC_ROTATION_ENABLED=on
+```
+
+没有邮件关键词时，日报不再每天固定检索同一组三大主题，而是按 ISO 星期轮换 7 个导航定位热点方向：
+
+| 星期 | 轮换主题 | 主要检索线索 |
+| --- | --- | --- |
+| 周一 | 具身导航与机器人基础模型 | embodied navigation、VLM/VLA navigation、object navigation、navigation foundation model |
+| 周二 | 3DGS/NeRF 神经场 SLAM | 3D Gaussian Splatting、NeRF SLAM、neural implicit SLAM、dense visual SLAM |
+| 周三 | 开放词汇语义地图与语言导航 | open-vocabulary mapping、semantic mapping、language-guided navigation、scene graph |
+| 周四 | 地点识别与长期定位 | visual/LiDAR place recognition、loop closure、long-term localization、re-localization |
+| 周五 | 多机器人协同 SLAM 与分布式建图 | multi-robot SLAM、collaborative SLAM、distributed mapping、cooperative localization |
+| 周六 | 韧性 PNT 与 GNSS 抗欺骗抗干扰 | resilient PNT、GNSS spoofing/jamming、OSNMA、LEO PNT、GNSS denied |
+| 周日 | 退化场景多模态融合与鲁棒里程计 | LiDAR-inertial、visual-inertial、factor graph fusion、degeneracy-aware odometry |
+
+执行优先级：
+
+1. 邮件指令或命令行传入 `关键词` 时，优先使用这些关键词。
+2. 没有自定义关键词且 `TOPIC_ROTATION_ENABLED=on` 时，使用当天轮换主题。
+3. 如果当天主题没有强匹配论文，自动退回七日热点主题池做补位检索。
+4. 如果设置 `TOPIC_ROTATION_ENABLED=off`，回到旧的 GNSS / 融合 / SLAM 综合检索。
+
+手动测试某一天的轮换主题：
+
+```bash
+python -m daily_gnss_slam_digest --issue-date 2026-07-04 --publish-mode none
+```
+
+关闭轮换：
+
+```bash
+TOPIC_ROTATION_ENABLED=off
+```
+
+## 7. 如何修改每日运行时间
 
 时间格式是 `HH:MM`，例如 `21:30`、`08:15`、`23:45`。
 
@@ -192,7 +231,7 @@ AUTOMATION_TIME=21:30
 
 注意：只改 `.env` 不会自动刷新已经安装好的 `launchd` 定时器。改完时间后，必须重新运行一次 `scripts/install_daily_launchd.sh`。
 
-## 7. 如何手动运行
+## 8. 如何手动运行
 
 手动跑完整每日自动化：
 
@@ -224,7 +263,7 @@ launchctl kickstart -k gui/$(id -u)/com.codex.daily-gnss-slam-digest
 ./scripts/generate_weekly_summary.sh
 ```
 
-## 8. 运行模式说明
+## 9. 运行模式说明
 
 `AUTOMATION_WECHAT_MODE` 和 `AUTOMATION_DEEPDIVE_MODE` 支持三个值：
 
@@ -243,7 +282,7 @@ AUTOMATION_DEEPDIVE_MODE=draft
 
 因为微信公众号正式发布接口 `freepublish` 需要账号具备对应权限。如果没有权限，`publish` 可能返回 `48001 api unauthorized`。这种情况下草稿仍会保留，可以到公众号后台手动发布。
 
-## 9. 邮件提醒逻辑
+## 10. 邮件提醒逻辑
 
 邮件配置在 `.env` 中：
 
@@ -275,11 +314,11 @@ EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES=1
 EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES=0
 ```
 
-## 10. 邮件指令控制
+## 11. 邮件指令控制
 
 除了每日定时任务，也可以通过邮件临时指定关键词，让系统按当前方案生成一组定制论文推荐和论文解读。
 
-### 10.1 开启邮件指令
+### 11.1 开启邮件指令
 
 `.env` 中配置：
 
@@ -311,7 +350,7 @@ QQ 邮箱通常使用授权码，不是网页登录密码。如果 `EMAIL_COMMAN
 ./scripts/process_email_commands.sh
 ```
 
-### 10.2 邮件怎么写
+### 11.2 邮件怎么写
 
 邮件必须满足两个条件：
 
@@ -369,7 +408,7 @@ outputs/email_commands/<运行时间>/
 解读数量：0
 ```
 
-### 10.3 支持的任务写法
+### 11.3 支持的任务写法
 
 `任务` 可以用英文或中文：
 
@@ -381,7 +420,7 @@ outputs/email_commands/<运行时间>/
 
 如果只写 `任务：deepdive`，系统会自动先跑 `digest`，因为论文解读需要先有推荐列表 JSON。
 
-### 10.4 邮件扫描范围
+### 11.4 邮件扫描范围
 
 邮件指令脚本不再只看未读邮件。它会同时检查：
 
@@ -406,7 +445,7 @@ outputs/email_commands/processed_commands.json
 
 第一条只预览，第二条才会真正生成。定时任务不要加这个参数，否则旧指令可能被重复执行。
 
-### 10.5 `Processed email commands: 0` 怎么看？
+### 11.5 `Processed email commands: 0` 怎么看？
 
 手动执行：
 
@@ -444,7 +483,7 @@ Processed email commands: 0
 
 如果 `skipped already processed` 是 1，说明这封邮件已经正式执行过。要重新执行，建议重新发一封新邮件，而不是改本地状态文件。
 
-## 11. 输出文件和日志
+## 12. 输出文件和日志
 
 每日推荐文章输出在：
 
@@ -484,9 +523,9 @@ outputs/logs/email-commands.out.log
 outputs/logs/email-commands.err.log
 ```
 
-## 12. 常见问题
+## 13. 常见问题
 
-### 12.1 改了 `.env` 时间，为什么没有按新时间跑？
+### 13.1 改了 `.env` 时间，为什么没有按新时间跑？
 
 因为 `.env` 只是项目配置，系统定时任务已经被写入 `~/Library/LaunchAgents/`。改完 `.env` 后，需要重新运行：
 
@@ -494,7 +533,7 @@ outputs/logs/email-commands.err.log
 ./scripts/install_daily_launchd.sh
 ```
 
-### 12.2 微信接口报 IP 白名单错误怎么办？
+### 13.2 微信接口报 IP 白名单错误怎么办？
 
 微信公众号 API 要求当前公网 IP 在公众号后台的 IP 白名单中。报错类似：
 
@@ -504,7 +543,7 @@ invalid ip xxx.xxx.xxx.xxx, not in whitelist
 
 解决方式是在公众号后台的“安全中心 / IP 白名单”里加入当前脚本运行机器的公网 IP。
 
-### 12.3 launchd 报 Operation not permitted 怎么办？
+### 13.3 launchd 报 Operation not permitted 怎么办？
 
 如果日志里出现：
 
@@ -524,7 +563,7 @@ Operation not permitted
 ./scripts/install_daily_launchd.sh HH:MM
 ```
 
-### 12.4 为什么没有直接正式发布？
+### 13.4 为什么没有直接正式发布？
 
 当前默认是 `draft` 模式，只创建草稿，不正式发布。这样更安全，可以先人工检查排版、封面和图片。
 
@@ -537,7 +576,7 @@ AUTOMATION_DEEPDIVE_MODE=publish
 
 但前提是公众号账号具备 `freepublish` 接口权限。
 
-### 12.5 怎么确认定时任务已经安装？
+### 13.5 怎么确认定时任务已经安装？
 
 重新运行安装脚本后，如果看到类似输出，说明已经安装：
 
@@ -552,7 +591,7 @@ Schedule: daily at 09:00
 launchctl kickstart -k gui/$(id -u)/com.codex.daily-gnss-slam-digest
 ```
 
-### 12.6 GitHub 没有提交怎么办？
+### 13.6 GitHub 没有提交怎么办？
 
 检查以下配置：
 

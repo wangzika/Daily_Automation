@@ -9,7 +9,15 @@ from pathlib import Path
 from .arxiv_client import ArxivClient
 from .assets import ensure_article_assets
 from .article import build_digest, build_html, build_title, write_outputs
-from .config import DEFAULT_OUTPUT_DIR, TOPICS, arxiv_query_from_keywords, parse_keyword_text, topic_from_keywords
+from .config import (
+    DEFAULT_OUTPUT_DIR,
+    ROTATING_TOPICS,
+    TOPICS,
+    arxiv_query_from_keywords,
+    parse_keyword_text,
+    rotating_topic_for_date,
+    topic_from_keywords,
+)
 from .notify import describe_notification_result, notify_draft_created, notify_publish_issue
 from .recommender import recommend
 from .sample_data import SAMPLE_PAPERS
@@ -21,15 +29,27 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     issue_date = date.fromisoformat(args.issue_date) if args.issue_date else date.today()
     keywords = parse_keyword_text(args.keywords)
+    focus_topic = ""
+    fallback_queries: list[str] = []
+    fallback_topics = ROTATING_TOPICS
     if keywords:
         custom_topic = topic_from_keywords(keywords)
         search_queries = [custom_topic.query]
         scoring_topics = (custom_topic, *TOPICS)
+        focus_topic = custom_topic.cn_name
         print(f"Using custom paper keywords: {', '.join(keywords)}")
         print(f"Custom arXiv query: {arxiv_query_from_keywords(keywords)}")
+    elif args.topic_rotation == "on":
+        rotating_topic = rotating_topic_for_date(issue_date)
+        search_queries = [rotating_topic.query]
+        scoring_topics = (rotating_topic,)
+        fallback_queries = [topic.query for topic in ROTATING_TOPICS]
+        focus_topic = rotating_topic.cn_name
+        print(f"Using rotating daily topic: {rotating_topic.cn_name} ({rotating_topic.name})")
     else:
         search_queries = [topic.query for topic in TOPICS]
         scoring_topics = TOPICS
+        focus_topic = "GNSS/融合/SLAM 综合方向"
 
     if args.sample:
         papers = SAMPLE_PAPERS
@@ -47,6 +67,18 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     recommendations = recommend(papers, limit=args.limit, days_back=args.days_back, topics=scoring_topics)
+    if not recommendations and fallback_queries and not args.sample:
+        print("No strong match for today's rotating topic. Falling back to all rotating hot topics.", file=sys.stderr)
+        papers = client.search_many(fallback_queries, max_results_per_query=max(args.per_topic // 2, 10))
+        if args.semantic_scholar == "on":
+            papers = enrich_papers(
+                papers,
+                client=SemanticScholarClient(),
+                max_papers=args.quality_enrich_limit,
+                delay_seconds=args.semantic_scholar_delay,
+            )
+        recommendations = recommend(papers, limit=args.limit, days_back=args.days_back, topics=fallback_topics)
+        focus_topic = "七日轮换热点综合补位"
     if not recommendations:
         print("No matching papers found.", file=sys.stderr)
         return 2
@@ -58,6 +90,7 @@ def main(argv: list[str] | None = None) -> int:
         issue_date=issue_date,
         output_dir=args.output_dir,
         image_paths=local_image_paths,
+        focus_topic=focus_topic,
     )
     print(f"Wrote markdown: {paths['markdown']}")
     print(f"Wrote html: {paths['html']}")
@@ -70,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     title = build_title(issue_date)
-    digest = build_digest(recommendations)
+    digest = build_digest(recommendations, focus_topic=focus_topic)
     source_url = recommendations[0].paper.url
 
     try:
@@ -81,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
             key: publisher.upload_article_image(access_token, path)
             for key, path in asset_paths.items()
         }
-        html_content = build_html(recommendations, issue_date, image_urls=article_image_urls)
+        html_content = build_html(recommendations, issue_date, image_urls=article_image_urls, focus_topic=focus_topic)
         media_id = publisher.add_draft(
             access_token=access_token,
             title=title,
@@ -169,5 +202,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=float,
         default=float(os.getenv("SEMANTIC_SCHOLAR_DELAY_SECONDS", "1.0")),
         help="Delay between Semantic Scholar requests, in seconds.",
+    )
+    parser.add_argument(
+        "--topic-rotation",
+        choices=("on", "off"),
+        default=os.getenv("TOPIC_ROTATION_ENABLED", "on"),
+        help="Use a weekday rotating hot topic when no custom keywords are provided.",
     )
     return parser.parse_args(argv)

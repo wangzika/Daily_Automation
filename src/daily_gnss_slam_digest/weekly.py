@@ -4,11 +4,14 @@ import argparse
 import html
 import json
 import os
+import re
 from collections import Counter
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
+
+from .config import ROBOTICS_TREND_TOPICS, TopicProfile
 
 
 @dataclass(frozen=True)
@@ -82,10 +85,12 @@ def build_weekly_summary(papers: list[WeeklyPaper]) -> dict[str, Any]:
     topic_counter: Counter[str] = Counter()
     term_counter: Counter[str] = Counter()
     direction_counter: Counter[str] = Counter()
+    robotics_trend_counter: Counter[str] = Counter()
     for paper in papers:
         topic_counter.update(paper.topic_scores.keys())
         term_counter.update(term for term in paper.matched_terms if len(term) > 2)
         direction_counter.update(_directions_for(paper))
+        robotics_trend_counter.update(_robotics_trends_for(paper))
 
     top_papers = sorted(papers, key=lambda item: (item.quality_score, item.score), reverse=True)[:8]
     code_papers = [paper for paper in top_papers if paper.quality_signals.get("code_url") or paper.quality_signals.get("code_signal")]
@@ -97,6 +102,7 @@ def build_weekly_summary(papers: list[WeeklyPaper]) -> dict[str, Any]:
         "hot_topics": topic_counter.most_common(8),
         "hot_terms": term_counter.most_common(16),
         "hot_directions": direction_counter.most_common(8),
+        "hot_robotics_trends": robotics_trend_counter.most_common(10),
         "top_papers": [_paper_to_json(paper) for paper in top_papers],
         "code_papers": [_paper_to_json(paper) for paper in code_papers[:5]],
         "venue_papers": [_paper_to_json(paper) for paper in venue_papers[:5]],
@@ -112,6 +118,10 @@ def build_markdown(summary: dict[str, Any], end_date: date) -> str:
         "## 热点方向",
         "",
         *_markdown_ranked(summary["hot_directions"]),
+        "",
+        "## 机器人领域热点雷达",
+        "",
+        *_markdown_ranked(summary["hot_robotics_trends"]),
         "",
         "## 高频主题",
         "",
@@ -164,6 +174,8 @@ def build_html(summary: dict[str, Any], end_date: date) -> str:
         _paragraph(f"本周共聚合 {summary['paper_count']} 篇日报候选论文，覆盖日期：{', '.join(summary['source_dates'])}。"),
         _section_title("热点方向"),
         _ranked_cards(summary["hot_directions"]),
+        _section_title("机器人领域热点雷达"),
+        _ranked_cards(summary["hot_robotics_trends"]),
         _section_title("高频主题"),
         _ranked_cards(summary["hot_topics"]),
         _section_title("高频关键词"),
@@ -254,13 +266,58 @@ def _directions_for(paper: WeeklyPaper) -> list[str]:
     return directions or ["其他定位感知方向"]
 
 
+def _robotics_trends_for(paper: WeeklyPaper) -> list[str]:
+    text = _trend_text(paper)
+    matches: list[tuple[str, float]] = []
+    for topic in ROBOTICS_TREND_TOPICS:
+        score = _trend_score(text, topic)
+        if score >= _trend_threshold(topic):
+            matches.append((topic.cn_name, score))
+    matches.sort(key=lambda item: item[1], reverse=True)
+    return [name for name, _score in matches[:3]]
+
+
+def _trend_text(paper: WeeklyPaper) -> str:
+    pieces = [
+        paper.title,
+        " ".join(paper.topic_scores.keys()),
+        " ".join(paper.matched_terms),
+        str(paper.quality_signals.get("venue") or ""),
+    ]
+    return " ".join(pieces).lower()
+
+
+def _trend_score(text: str, topic: TopicProfile) -> float:
+    score = 0.0
+    for term, weight in topic.keywords.items():
+        if _contains_term(text, term):
+            score += weight
+    return score
+
+
+def _trend_threshold(topic: TopicProfile) -> float:
+    if topic.name in {"embodied_nav_foundation_models", "robot_world_models", "humanoid_navigation", "robot_policy_learning"}:
+        return 9.0
+    return 8.0
+
+
+def _contains_term(text: str, term: str) -> bool:
+    lowered = term.lower()
+    if " " in lowered or "-" in lowered or "/" in lowered:
+        return lowered in text
+    return re.search(rf"\b{re.escape(lowered)}\b", text) is not None
+
+
 def _editor_note(summary: dict[str, Any]) -> str:
     directions = [name for name, _count in summary["hot_directions"][:3]]
+    robotics_trends = [name for name, _count in summary.get("hot_robotics_trends", [])[:3]]
     terms = [name for name, _count in summary["hot_terms"][:6]]
     direction_text = "、".join(directions) if directions else "GNSS/融合/SLAM 交叉方向"
+    robotics_text = "、".join(robotics_trends) if robotics_trends else "机器人导航、定位与具身智能"
     term_text = "、".join(terms) if terms else "鲁棒定位、传感器融合、异常检测"
     return (
-        f"本周最值得继续跟踪的是 {direction_text}。关键词上，{term_text} 出现频率较高；"
+        f"本周最值得继续跟踪的是 {direction_text}。放到更宽的机器人领域看，{robotics_text} 的信号最强。"
+        f"关键词上，{term_text} 出现频率较高；"
         "后续选题可以优先挑有代码、真实实验或明确 venue/引用信号的论文做深度解读。"
     )
 

@@ -76,6 +76,8 @@ def recommend(
     for item in ranked:
         if len(selected) >= limit:
             break
+        if not item.topic_scores:
+            continue
         key = _paper_key(item.paper)
         if key not in selected_ids:
             selected.append(item)
@@ -135,6 +137,19 @@ def _passes_topic_gate(topic: TopicProfile, matched_terms: list[str], score: flo
         return score >= 10.0
     if topic.name == "slam_odometry":
         return score >= 9.0
+    if topic.name == "resilient_pnt_gnss_denied":
+        platform_terms = {"gnss", "gps", "pnt", "resilient pnt", "osnma", "leo pnt", "gnss denied"}
+        risk_terms = {"spoofing", "jamming", "interference", "integrity", "c/n0", "agc"}
+        return bool(terms & platform_terms) and bool(terms & risk_terms) and score >= 12.0
+    if topic.name in {
+        "embodied_nav_foundation_models",
+        "neural_3d_slam",
+        "open_vocabulary_semantic_mapping",
+        "place_recognition_long_term_localization",
+        "collaborative_multi_robot_slam",
+        "robust_multimodal_odometry",
+    }:
+        return score >= 10.0
     return score > 0
 
 

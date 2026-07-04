@@ -22,6 +22,7 @@ class WeeklySummaryTest(unittest.TestCase):
         self.assertEqual(len(papers), 2)
         self.assertEqual(summary["paper_count"], 2)
         self.assertTrue(summary["hot_directions"])
+        self.assertTrue(summary["hot_robotics_trends"])
         self.assertTrue(summary["code_papers"])
         self.assertTrue(paths["markdown"].name.endswith("gnss-slam-weekly.md"))
 
