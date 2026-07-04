@@ -296,6 +296,8 @@ launchctl kickstart -k gui/$(id -u)/com.codex.daily-gnss-slam-digest
 ./scripts/generate_deepdives.sh draft
 ```
 
+如果当天推荐列表还不存在，`generate_deepdives.sh` 会先自动生成当天 `gnss-slam-digest.json`，再继续生成论文解读；如果显式设置了 `DIGEST_JSON`，则会要求这个文件必须存在。
+
 论文解读配图还可以指定第二个参数：
 
 | 模式 | 用法 | 说明 |

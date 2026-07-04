@@ -35,7 +35,8 @@ MODE="${1:-none}"
 IMAGE_MODE="${2:-${DEEPDIVE_IMAGE_MODE:-paper}}"
 LIMIT="${DEEPDIVE_LIMIT:-3}"
 TODAY="${DIGEST_DATE:-$(date +%F)}"
-INPUT_JSON="${DIGEST_JSON:-outputs/${TODAY}-gnss-slam-digest.json}"
+DIGEST_DIR="${DIGEST_OUTPUT_DIR:-outputs}"
+INPUT_JSON="${DIGEST_JSON:-${DIGEST_DIR}/${TODAY}-gnss-slam-digest.json}"
 
 if [[ "$MODE" != "none" && "$MODE" != "draft" && "$MODE" != "publish" ]]; then
   echo "Usage: $0 [none|draft|publish] [paper|ai|both]" >&2
@@ -55,6 +56,36 @@ elif [[ -x .venv/bin/python ]]; then
   PYTHON=.venv/bin/python
 else
   PYTHON=python3
+fi
+
+if [[ ! -f "$INPUT_JSON" ]]; then
+  if [[ -n "${DIGEST_JSON:-}" ]]; then
+    echo "Digest JSON not found: $INPUT_JSON" >&2
+    echo "Please check DIGEST_JSON, or unset it to let this script generate today's digest first." >&2
+    exit 2
+  fi
+
+  echo "Digest JSON not found: $INPUT_JSON" >&2
+  echo "Generating today's digest first with publish-mode=none..." >&2
+  if [[ -n "${DIGEST_DATE:-}" ]]; then
+    PYTHONPATH="$PROJECT_DIR/src${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON" -m daily_gnss_slam_digest \
+      --output-dir "$DIGEST_DIR" \
+      --limit "${DIGEST_LIMIT:-5}" \
+      --days-back "${DIGEST_DAYS_BACK:-180}" \
+      --publish-mode none \
+      --issue-date "$DIGEST_DATE"
+  else
+    PYTHONPATH="$PROJECT_DIR/src${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON" -m daily_gnss_slam_digest \
+      --output-dir "$DIGEST_DIR" \
+      --limit "${DIGEST_LIMIT:-5}" \
+      --days-back "${DIGEST_DAYS_BACK:-180}" \
+      --publish-mode none
+  fi
+
+  if [[ ! -f "$INPUT_JSON" ]]; then
+    echo "Digest generation finished, but expected JSON is still missing: $INPUT_JSON" >&2
+    exit 2
+  fi
 fi
 
 PYTHONPATH="$PROJECT_DIR/src${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON" -m daily_gnss_slam_digest.deepdive \

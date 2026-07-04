@@ -161,6 +161,8 @@ PYTHONPATH=src python scripts/upload_cover_to_wechat.py outputs/wechat-cover-gns
 ./scripts/generate_deepdives.sh none
 ```
 
+如果当天的 `outputs/YYYY-MM-DD-gnss-slam-digest.json` 还不存在，脚本会先用 `publish-mode=none` 自动生成当天推荐列表，再继续生成论文解读。
+
 生成微信公众号草稿：
 
 ```bash
