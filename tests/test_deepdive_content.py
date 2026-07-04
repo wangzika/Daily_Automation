@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import unittest
+import tempfile
 from pathlib import Path
+
+from PIL import Image
 
 from daily_gnss_slam_digest.deepdive import (
     DeepDiveFigure,
     PaperReading,
+    TextPolishResult,
+    _content_mode_label,
     _display_figure_caption,
     _extract_base64_image,
     _figure_reading,
     _image_variants,
+    _prepare_article_figures,
     build_deepdive_html,
     build_deepdive_markdown,
 )
@@ -132,6 +138,40 @@ class DeepDiveContentTest(unittest.TestCase):
             ]
         }
         self.assertEqual(_extract_base64_image(payload), "YWJj")
+
+    def test_experiment_figures_are_combined_before_article_rendering(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            cover = tmp_path / "cover.jpg"
+            result_a = tmp_path / "result-a.jpg"
+            result_b = tmp_path / "result-b.jpg"
+            Image.new("RGB", (800, 360), "white").save(cover)
+            Image.new("RGB", (800, 360), "gray").save(result_a)
+            Image.new("RGB", (800, 360), "silver").save(result_b)
+
+            figures = [
+                DeepDiveFigure(cover, "Fig. 1. System overview of SA-LIVO."),
+                DeepDiveFigure(result_a, "Fig. 2. Representative mapping results of SA-LIVO across diverse environments."),
+                DeepDiveFigure(result_b, "Fig. 3. Trajectory evaluation on campus sequences."),
+            ]
+
+            prepared = _prepare_article_figures(figures, tmp_path, 2)
+
+            self.assertEqual(prepared[0].path, cover)
+            self.assertEqual(prepared[1].source, "paper_composite")
+            self.assertTrue(prepared[1].path.exists())
+            self.assertTrue(_display_figure_caption(prepared[1].caption, 2, prepared[1].source).startswith("实验图："))
+
+    def test_polished_text_overrides_traditional_text(self) -> None:
+        paper = {"title": "Example", "authors": [], "abstract": "GNSS spoofing risk.", "matched_terms": ["gnss"]}
+        reading = PaperReading("GNSS spoofing risk.", "", "", "", "", ())
+        figures: list[DeepDiveFigure] = []
+        polish = TextPolishResult("api", "ok", {"one_sentence": "润色后的一句话。"})
+
+        markdown = build_deepdive_markdown(paper, reading, figures, {}, text_polish=polish)
+
+        self.assertIn("润色后的一句话。", markdown)
+        self.assertEqual(_content_mode_label("api"), "API 润色")
 
 
 if __name__ == "__main__":

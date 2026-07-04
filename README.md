@@ -179,6 +179,8 @@ PYTHONPATH=src python scripts/upload_cover_to_wechat.py outputs/wechat-cover-gns
 
 其中 `paper` 版本只使用论文原图，并按 `DEEPDIVE_FIGURE_KEYWORDS` 里的关键词优先匹配流程图、框架图、系统图；`ai` 版本会用 `GEMINI_API_KEY` 生成 16:9 概念主图，再保留少量论文原图辅助解读。默认模式由 `.env` 里的 `DEEPDIVE_IMAGE_MODE=paper|ai|both` 控制。
 
+正文文案默认优先用 Gemini 做轻量润色，API 不可用、额度不足或未配置 Key 时会自动回退到传统本地文案；邮件通知里会标明“API 润色”或“传统回退”。实验/结果类图片会优先合成为一张组合图，再做整体解释，避免一张张图机械铺开。
+
 确认草稿后也可以提交发布：
 
 ```bash

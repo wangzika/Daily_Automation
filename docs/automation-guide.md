@@ -306,6 +306,8 @@ launchctl kickstart -k gui/$(id -u)/com.codex.daily-gnss-slam-digest
 | `ai` | `./scripts/generate_deepdives.sh draft ai` | 用 `GEMINI_API_KEY` 生成 16:9 概念主图，再搭配论文原图 |
 | `both` | `./scripts/generate_deepdives.sh draft both` | 同一篇论文生成原图版和 AI 版两份草稿，便于在公众号后台对比 |
 
+正文文案默认 `DEEPDIVE_TEXT_POLISH_MODE=api`，会优先调用 Gemini 做润色；如果 API 不可用、额度不足或没有配置 Key，会自动回退到传统本地文案。草稿邮件会标明“内容模式”和“配图模式”。实验/结果类图片默认 `DEEPDIVE_EXPERIMENT_COMPOSITE=1`，会合成为一张组合图再做整体解释。
+
 如果要让每日自动化默认生成两个版本，把 `.env` 改成：
 
 ```env

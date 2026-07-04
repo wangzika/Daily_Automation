@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from datetime import date
@@ -34,6 +35,7 @@ class DeepDiveFigure:
     path: Path
     caption: str
     source: str = "paper"
+    children: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,13 @@ class PaperReading:
     captions: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class TextPolishResult:
+    mode: str
+    reason: str = ""
+    texts: dict[str, str] | None = None
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     papers = json.loads(args.input_json.read_text(encoding="utf-8"))[: args.limit]
@@ -55,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     created: list[Path] = []
+    article_runtime_items: list[dict[str, Any]] = []
     draft_ids: list[str] = []
     draft_email_items: list[dict[str, Any]] = []
     cover_media_ids: list[str] = []
@@ -87,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
             pdf_path,
             paper_dir,
             captions,
-            max_figures=args.figures,
+            max_figures=_figure_pool_size(args.figures),
             figure_keywords=_split_keywords(args.figure_keywords),
         )
         fallback_figures: list[DeepDiveFigure] = []
@@ -107,9 +117,11 @@ def main(argv: list[str] | None = None) -> int:
             if not figures:
                 print(f"No figures available for {variant} deep dive: {paper.get('title', '')}", file=sys.stderr)
 
+            text_polish = _generate_text_polish(paper, reading, figures)
+            image_runtime_mode = _image_runtime_mode(variant, figures)
             local_image_map = {f"figure_{i}": figure.path.name for i, figure in enumerate(figures, start=1)}
-            markdown = build_deepdive_markdown(paper, reading, figures, local_image_map)
-            html_text = build_deepdive_html(paper, reading, figures, local_image_map)
+            markdown = build_deepdive_markdown(paper, reading, figures, local_image_map, text_polish=text_polish)
+            html_text = build_deepdive_html(paper, reading, figures, local_image_map, text_polish=text_polish)
 
             article_stem = _article_stem(variant, variants)
             md_path = paper_dir / f"{article_stem}.md"
@@ -117,6 +129,16 @@ def main(argv: list[str] | None = None) -> int:
             md_path.write_text(markdown, encoding="utf-8")
             html_path.write_text(html_text, encoding="utf-8")
             created.append(html_path)
+            article_runtime_items.append(
+                {
+                    "variant": variant,
+                    "html_path": str(html_path),
+                    "md_path": str(md_path),
+                    "content_mode": text_polish.mode,
+                    "content_reason": text_polish.reason,
+                    "image_mode": image_runtime_mode,
+                }
+            )
             print(f"Wrote {variant} deep dive: {html_path}")
 
             if publisher and access_token:
@@ -134,7 +156,14 @@ def main(argv: list[str] | None = None) -> int:
                     f"figure_{i}": publisher.upload_article_image(access_token, figure.path)
                     for i, figure in enumerate(figures, start=1)
                 }
-                wechat_html = build_deepdive_html(paper, reading, figures, image_urls, include_title=False)
+                wechat_html = build_deepdive_html(
+                    paper,
+                    reading,
+                    figures,
+                    image_urls,
+                    include_title=False,
+                    text_polish=text_polish,
+                )
                 title = _wechat_title(paper, variant=variant if len(variants) > 1 else None)
                 media_id = publisher.add_draft(
                     access_token=access_token,
@@ -150,8 +179,11 @@ def main(argv: list[str] | None = None) -> int:
                         "title": title,
                         "media_id": media_id,
                         "source_url": paper.get("url"),
-                        "html_path": html_path,
-                        "md_path": md_path,
+                        "html_path": str(html_path),
+                        "md_path": str(md_path),
+                        "content_mode": text_polish.mode,
+                        "content_reason": text_polish.reason,
+                        "image_mode": image_runtime_mode,
                     }
                 )
                 print(f"Created WeChat {variant} deep-dive draft media_id: {media_id}")
@@ -203,8 +235,10 @@ def main(argv: list[str] | None = None) -> int:
         json.dumps(
             {
                 "articles": [str(path) for path in created],
+                "articles_detail": article_runtime_items,
                 "draft_media_ids": draft_ids,
                 "cover_media_ids": cover_media_ids,
+                "drafts": draft_email_items,
                 "publish_results": publish_results,
             },
             ensure_ascii=False,
@@ -258,8 +292,13 @@ def _notify_deepdive_drafts_created(
             [
                 f"{index}. {draft['title']}",
                 f"   media_id：{draft['media_id']}",
+                f"   内容模式：{_content_mode_label(str(draft.get('content_mode') or 'fallback'))}",
+                f"   配图模式：{draft.get('image_mode') or '论文原图'}",
             ]
         )
+        reason = str(draft.get("content_reason") or "")
+        if draft.get("content_mode") != "api" and reason:
+            lines.append(f"   回退原因：{reason}")
 
     if publish_blocked_reason:
         lines.extend(["", "【发布提醒】", f"- 正式发布已跳过：{publish_blocked_reason}"])
@@ -277,11 +316,21 @@ def _notify_deepdive_drafts_created(
     return notify_automation_summary(subject=f"公众号论文解读草稿已创建｜{len(drafts)}篇", lines=lines)
 
 
+def _content_mode_label(mode: str) -> str:
+    if mode == "api":
+        return "API 润色"
+    if mode == "disabled":
+        return "传统模式"
+    return "传统回退"
+
+
 def build_deepdive_markdown(
     paper: dict[str, Any],
     reading: PaperReading,
     figures: list[DeepDiveFigure],
     image_map: dict[str, str],
+    *,
+    text_polish: TextPolishResult | None = None,
 ) -> str:
     title = _article_title(paper)
     chapters = _chapter_walkthrough(paper, reading)
@@ -295,7 +344,7 @@ def build_deepdive_markdown(
         "",
         "## 一句话读懂",
         "",
-        _one_sentence(paper, reading),
+        _polished_text(text_polish, "one_sentence", _one_sentence(paper, reading)),
         "",
         "## 读前抓手",
         "",
@@ -303,7 +352,7 @@ def build_deepdive_markdown(
         "",
         "## 故事版导读",
         "",
-        _story_intro(paper, reading),
+        _polished_text(text_polish, "story_intro", _story_intro(paper, reading)),
         "",
         "## 章节精读",
         "",
@@ -320,7 +369,7 @@ def build_deepdive_markdown(
                 "",
                 figure_caption,
                 "",
-                _figure_reading(paper, reading, figure, i),
+                _polished_text(text_polish, f"figure:{figure.path.name}", _figure_reading(paper, reading, figure, i)),
                 "",
             ]
         )
@@ -346,6 +395,7 @@ def build_deepdive_html(
     image_map: dict[str, str],
     *,
     include_title: bool = True,
+    text_polish: TextPolishResult | None = None,
 ) -> str:
     title = _article_title(paper)
     chapters = _chapter_walkthrough(paper, reading)
@@ -363,11 +413,11 @@ def build_deepdive_html(
         f'原文：<a href="{html.escape(paper.get("url", ""))}" style="color:#0b9984;text-decoration:none;">{html.escape(paper.get("url", ""))}</a>',
         "</section>",
         _section_title("一句话读懂"),
-        _paragraph(_one_sentence(paper, reading)),
+        _paragraph(_polished_text(text_polish, "one_sentence", _one_sentence(paper, reading))),
         _section_title("读前抓手"),
         _numbered_cards(_source_clues(paper, reading)),
         _section_title("故事版导读"),
-        _paragraph(_story_intro(paper, reading)),
+        _paragraph(_polished_text(text_polish, "story_intro", _story_intro(paper, reading))),
         _section_title("章节精读"),
         _chapter_cards(chapters[:2]),
         _inline_chapter_title(3, "主图和关键图解：先沿着数据流走一遍"),
@@ -383,7 +433,7 @@ def build_deepdive_html(
                 '<section style="margin:0 0 22px;padding:14px;border:1px solid #e1eeee;border-radius:10px;background:#ffffff;">',
                 f'<img src="{html.escape(src)}" alt="{html.escape(figure_caption)}" style="display:block;width:100%;height:auto;border-radius:6px;"/>',
                 f'<p style="margin:10px 0 8px;color:#0b9984;font-size:13px;font-weight:700;line-height:1.6;">{html.escape(figure_caption)}</p>',
-                f'<p style="margin:0;color:#43565d;font-size:14px;line-height:1.85;">{html.escape(_figure_reading(paper, reading, figure, i))}</p>',
+                f'<p style="margin:0;color:#43565d;font-size:14px;line-height:1.85;">{html.escape(_polished_text(text_polish, f"figure:{figure.path.name}", _figure_reading(paper, reading, figure, i)))}</p>',
                 "</section>",
             ]
         )
@@ -653,6 +703,9 @@ def _display_figure_caption(caption: str, display_index: int, source: str = "pap
     if source == "ai":
         body = _short_figure_caption_body(caption)
         return f"主图：{body}" if body else "主图：方法流程概念图"
+    if source == "paper_composite":
+        body = _short_figure_caption_body(_translate_figure_caption(caption))
+        return f"实验图：{body}" if body else "实验图：论文实验结果汇总"
     caption = _translate_figure_caption(caption)
     match = re.match(r"^(?:Fig(?:ure)?\.?)\s*(\d+)\s*[.:]?\s*(.*)$", caption, re.IGNORECASE)
     prefix = "主图" if display_index == 1 else "论文图"
@@ -830,17 +883,114 @@ def _figures_for_variant(
     output_dir: Path,
     max_figures: int,
 ) -> tuple[list[DeepDiveFigure], DeepDiveFigure | None]:
+    prepared_figures = _prepare_article_figures(source_figures, output_dir, max_figures)
     if variant == "ai":
         ai_cover = _generate_ai_cover_figure(paper, reading, output_dir)
         if ai_cover:
             remaining = max(max_figures - 1, 0)
-            figures = [ai_cover, *source_figures[:remaining]]
+            figures = [ai_cover, *prepared_figures[:remaining]]
             return figures, ai_cover
         print("Gemini cover unavailable; AI version falls back to paper figures.", file=sys.stderr)
 
-    cover = _select_cover_figure(source_figures)
-    figures = _move_cover_first(source_figures, cover)[:max_figures]
+    cover = _select_cover_figure(prepared_figures)
+    figures = _move_cover_first(prepared_figures, cover)[:max_figures]
     return figures, cover
+
+
+def _prepare_article_figures(source_figures: list[DeepDiveFigure], output_dir: Path, max_figures: int) -> list[DeepDiveFigure]:
+    if not source_figures:
+        return []
+    cover = _select_cover_figure(source_figures)
+    ordered = _move_cover_first(source_figures, cover)
+    if not _env_bool("DEEPDIVE_EXPERIMENT_COMPOSITE", True):
+        return ordered[:max_figures]
+
+    cover_path = cover.path if cover else None
+    non_cover = [figure for figure in ordered if figure.path != cover_path]
+    experiment_figures = [figure for figure in non_cover if _is_experiment_figure(figure)]
+    if len(experiment_figures) >= 2:
+        composite = _make_experiment_composite(experiment_figures[:4], output_dir)
+        rest = [figure for figure in non_cover if figure.path not in {item.path for item in experiment_figures[:4]}]
+        return ([cover] if cover else []) + [composite] + rest
+    return ordered[:max_figures]
+
+
+def _make_experiment_composite(figures: list[DeepDiveFigure], output_dir: Path) -> DeepDiveFigure:
+    images: list[Image.Image] = []
+    for figure in figures:
+        try:
+            with Image.open(figure.path) as image:
+                images.append(_trim_white(image.convert("RGB")).copy())
+        except OSError:
+            continue
+    if len(images) < 2:
+        return figures[0]
+
+    columns = 2
+    rows = (len(images) + columns - 1) // columns
+    cell_width = 640
+    cell_height = 390
+    pad = 18
+    label_height = 28
+    canvas = Image.new("RGB", (columns * cell_width + (columns + 1) * pad, rows * (cell_height + label_height) + (rows + 1) * pad), "white")
+    for index, image in enumerate(images):
+        row = index // columns
+        column = index % columns
+        fitted = _fit_image(image, cell_width, cell_height)
+        x = pad + column * (cell_width + pad) + (cell_width - fitted.width) // 2
+        y = pad + row * (cell_height + label_height + pad)
+        canvas.paste(fitted, (x, y))
+        # A plain text label is enough to help readers map subfigures without changing the source image.
+        label = f"({chr(ord('a') + index)})"
+        label_x = pad + column * (cell_width + pad)
+        label_y = y + cell_height + 6
+        _draw_basic_label(canvas, label, label_x, label_y)
+
+    out = output_dir / "experiment-composite.jpg"
+    canvas.save(out, format="JPEG", quality=92, optimize=True, progressive=True)
+    translated = [_translate_figure_caption(figure.caption) for figure in figures if _has_real_figure_caption(figure.caption)]
+    caption = "组合实验图：" + "；".join(translated[:4]) if translated else "组合实验图：论文实验结果汇总"
+    return DeepDiveFigure(out, caption, source="paper_composite", children=tuple(figure.caption for figure in figures))
+
+
+def _fit_image(image: Image.Image, max_width: int, max_height: int) -> Image.Image:
+    copy = image.copy()
+    copy.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+    return copy
+
+
+def _draw_basic_label(image: Image.Image, label: str, x: int, y: int) -> None:
+    try:
+        from PIL import ImageDraw
+
+        draw = ImageDraw.Draw(image)
+        draw.text((x, y), label, fill=(48, 68, 76))
+    except Exception:
+        return
+
+
+def _is_experiment_figure(figure: DeepDiveFigure) -> bool:
+    if figure.source in {"ai", "pdf_page"}:
+        return False
+    caption = figure.caption.lower()
+    if any(term in caption for term in ("system overview", "framework", "architecture", "pipeline", "workflow", "block diagram")):
+        return False
+    return any(
+        term in caption
+        for term in (
+            "experiment",
+            "evaluation",
+            "result",
+            "mapping",
+            "trajectory",
+            "odometry",
+            "localization",
+            "pose",
+            "benchmark",
+            "performance",
+            "dataset",
+        )
+    )
 
 
 def _generate_ai_cover_figure(paper: dict[str, Any], reading: PaperReading, output_dir: Path) -> DeepDiveFigure | None:
@@ -974,6 +1124,33 @@ def _first_env(*names: str) -> str:
     return ""
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off", ""}
+
+
+def _figure_pool_size(max_figures: int) -> int:
+    try:
+        configured = int(os.getenv("DEEPDIVE_FIGURE_POOL", "6"))
+    except ValueError:
+        configured = 6
+    return max(max_figures, configured)
+
+
+def _image_runtime_mode(variant: str, figures: list[DeepDiveFigure]) -> str:
+    if variant == "ai":
+        if any(figure.source == "ai" for figure in figures):
+            return "AI 主图 + 论文图"
+        if any(figure.source == "paper_composite" for figure in figures):
+            return "AI 不可用，已回退论文图 + 实验组合图"
+        return "AI 不可用，已回退论文图"
+    if any(figure.source == "paper_composite" for figure in figures):
+        return "论文原图 + 实验组合图"
+    return "论文原图"
+
+
 def _split_keywords(value: str | tuple[str, ...] | None) -> tuple[str, ...]:
     if isinstance(value, tuple):
         return tuple(item.strip() for item in value if item.strip())
@@ -982,6 +1159,146 @@ def _split_keywords(value: str | tuple[str, ...] | None) -> tuple[str, ...]:
     parts = re.split(r"[,，;；\n]+", value)
     keywords = tuple(part.strip() for part in parts if part.strip())
     return keywords or _default_figure_keywords()
+
+
+def _generate_text_polish(paper: dict[str, Any], reading: PaperReading, figures: list[DeepDiveFigure]) -> TextPolishResult:
+    mode = os.getenv("DEEPDIVE_TEXT_POLISH_MODE", "api").strip().lower()
+    if mode in {"0", "false", "no", "off", "fallback", "traditional"}:
+        return TextPolishResult("fallback", "text polish disabled")
+    api_key = _first_env("GEMINI_API_KEY", "GOOGLE_API_KEY")
+    if not api_key:
+        return TextPolishResult("fallback", "missing GEMINI_API_KEY")
+
+    raw_texts = _text_polish_inputs(paper, reading, figures)
+    try:
+        polished = _request_gemini_text_polish(api_key, paper, raw_texts)
+    except (OSError, ValueError, RuntimeError, urllib.error.URLError, json.JSONDecodeError) as exc:
+        reason = _short_error(str(exc))
+        print(f"Gemini text polish skipped: {reason}", file=sys.stderr)
+        return TextPolishResult("fallback", reason)
+
+    cleaned = {
+        key: _clean_polished_text(value)
+        for key, value in polished.items()
+        if key in raw_texts and isinstance(value, str) and _clean_polished_text(value)
+    }
+    if not cleaned:
+        return TextPolishResult("fallback", "Gemini text polish returned no usable text")
+    return TextPolishResult("api", f"Gemini text model: {_gemini_text_model()}", cleaned)
+
+
+def _text_polish_inputs(paper: dict[str, Any], reading: PaperReading, figures: list[DeepDiveFigure]) -> dict[str, str]:
+    texts = {
+        "one_sentence": _one_sentence(paper, reading),
+        "story_intro": _story_intro(paper, reading),
+    }
+    for index, figure in enumerate(figures, start=1):
+        texts[f"figure:{figure.path.name}"] = _figure_reading(paper, reading, figure, index)
+    return texts
+
+
+def _request_gemini_text_polish(api_key: str, paper: dict[str, Any], texts: dict[str, str]) -> dict[str, str]:
+    model = _gemini_text_model()
+    endpoint = os.getenv("GEMINI_TEXT_ENDPOINT") or (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        + urllib.parse.quote(model, safe="")
+        + ":generateContent?key="
+        + urllib.parse.quote(api_key, safe="")
+    )
+    prompt = (
+        "你是中文科技公众号编辑。请润色下面这组论文解读文案，只提升自然度、顺滑度和可读性，"
+        "不要新增事实，不要删除关键风险机制、方法机制、实验机制，不要加入“AI”“自动生成”“邮件指定”等表述。"
+        "保持每个 key 对应一段中文文本，保留英文专有名词和单位。只返回 JSON 对象，键名必须与输入一致。\n\n"
+        f"论文题目：{_display_title(paper)}\n"
+        "待润色 JSON：\n"
+        + json.dumps(texts, ensure_ascii=False, indent=2)
+    )
+    body = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": float(os.getenv("GEMINI_TEXT_TEMPERATURE", "0.35")),
+            "responseMimeType": "application/json",
+        },
+    }
+    request = urllib.request.Request(
+        endpoint,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=float(os.getenv("GEMINI_TEXT_TIMEOUT_SECONDS", "60"))) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"Gemini text API HTTP {exc.code}: {detail}") from exc
+    text = _extract_gemini_text(payload)
+    if not text:
+        raise RuntimeError("Gemini text API response did not include text")
+    data = json.loads(_extract_json_object(text))
+    if not isinstance(data, dict):
+        raise RuntimeError("Gemini text polish response was not a JSON object")
+    return {str(key): str(value) for key, value in data.items()}
+
+
+def _gemini_text_model() -> str:
+    return os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
+
+
+def _extract_gemini_text(payload: Any) -> str:
+    if isinstance(payload, dict):
+        candidates = payload.get("candidates")
+        if isinstance(candidates, list):
+            for candidate in candidates:
+                text = _extract_gemini_text(candidate)
+                if text:
+                    return text
+        parts = payload.get("parts")
+        if isinstance(parts, list):
+            chunks = [part.get("text", "") for part in parts if isinstance(part, dict)]
+            return "\n".join(chunk for chunk in chunks if chunk).strip()
+        content = payload.get("content")
+        if isinstance(content, dict):
+            return _extract_gemini_text(content)
+        text = payload.get("text")
+        if isinstance(text, str):
+            return text.strip()
+    return ""
+
+
+def _extract_json_object(text: str) -> str:
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = re.sub(r"^```(?:json)?\s*", "", stripped)
+        stripped = re.sub(r"\s*```$", "", stripped)
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+    if start >= 0 and end > start:
+        return stripped[start : end + 1]
+    return stripped
+
+
+def _clean_polished_text(text: str) -> str:
+    text = _clean_text(text)
+    text = text.strip("` ")
+    if len(text) > 650:
+        text = text[:650].rstrip("，,；;。 ") + "。"
+    return text
+
+
+def _polished_text(polish: TextPolishResult | None, key: str, fallback: str) -> str:
+    if polish and polish.texts:
+        value = polish.texts.get(key)
+        if value:
+            return value
+    return fallback
+
+
+def _short_error(text: str) -> str:
+    text = _clean_text(text)
+    if len(text) <= 160:
+        return text
+    return text[:157].rstrip() + "..."
 
 
 def _one_sentence(paper: dict[str, Any], reading: PaperReading | None = None) -> str:
@@ -1186,6 +1503,19 @@ def _figure_reading(paper: dict[str, Any], reading: PaperReading, figure: DeepDi
         return (
             "这是一页论文截图，适合作为全文入口。它的价值不是展示某个具体实验图，"
             f"而是帮读者先看到论文如何引出{profile['problem']}，再进入方法和实验部分。"
+        )
+    if figure.source == "paper_composite":
+        translated = [_translate_figure_caption(caption) for caption in figure.children if _has_real_figure_caption(caption)]
+        if translated:
+            joined = "；".join(translated[:4])
+            return (
+                f"这是一组实验图合成预览，原图注大致对应：“{joined}”。"
+                "放在一起看，重点不是逐个抠细节，而是判断作者是否覆盖了足够多的场景、轨迹或结果形态，"
+                f"以及这些结果能否支撑{profile['experiment']}这一部分的结论。"
+            )
+        return (
+            "这是一组实验图合成预览。放在一起看，重点不是逐个抠细节，"
+            f"而是判断作者是否覆盖了足够多的场景、轨迹或结果形态，以及这些结果能否支撑{profile['experiment']}这一部分的结论。"
         )
     if any(term in lowered for term in ("setup", "framework", "architecture", "system", "overview", "pipeline", "workflow", "flow")):
         return (
