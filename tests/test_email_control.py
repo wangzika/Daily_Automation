@@ -122,7 +122,7 @@ class KeywordCommandTest(unittest.TestCase):
 
         self.assertIsNotNone(command)
         assert command is not None
-        self.assertEqual(command.keywords, "GNSS timing spoofing protection level")
+        self.assertEqual(command.keywords, "GNSS timing, spoofing, protection level")
         self.assertEqual(command.tasks, ("digest", "deepdive"))
 
     def test_summary_only_task_skips_deepdive(self) -> None:

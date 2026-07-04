@@ -217,7 +217,7 @@ def command_from_message(message: Message, config: EmailCommandConfig) -> PaperC
     text = _normalize_command_text(subject + "\n" + _message_text(message))
     fields = _parse_fields(text)
     keywords = fields.get("keywords") or fields.get("keyword") or fields.get("关键词") or fields.get("关键字") or ""
-    keywords = keywords.strip()
+    keywords = _normalize_keywords_value(keywords)
     if not keywords:
         return None
 
@@ -663,6 +663,46 @@ def _strip_html(value: str) -> str:
 def _normalize_command_text(value: str) -> str:
     value = html.unescape(value)
     return value.replace("\xa0", " ").replace("\u200b", "").replace("\ufeff", "")
+
+
+def _normalize_keywords_value(value: str) -> str:
+    value = re.sub(r"\s+", " ", _normalize_command_text(value)).strip()
+    if not value or re.search(r"[,;，；、]", value):
+        return value
+    tokens = value.split()
+    if len(tokens) < 4:
+        return value
+    phrases = {
+        ("protection", "level"),
+        ("robust", "localization"),
+        ("sensor", "fusion"),
+        ("visual", "inertial"),
+        ("inertial", "odometry"),
+        ("neural", "mapping"),
+        ("semantic", "mapping"),
+        ("place", "recognition"),
+        ("loop", "closure"),
+        ("object", "navigation"),
+        ("object", "nav"),
+        ("timing", "protection"),
+        ("gnss", "timing"),
+        ("gnss", "spoofing"),
+        ("gnss", "jamming"),
+    }
+    chunks: list[str] = []
+    i = 0
+    while i < len(tokens):
+        current = tokens[i]
+        if current.lower() in {"and", "or", "with", "for", "of", "the"}:
+            i += 1
+            continue
+        if i + 1 < len(tokens) and (tokens[i].lower(), tokens[i + 1].lower()) in phrases:
+            chunks.append(f"{tokens[i]} {tokens[i + 1]}")
+            i += 2
+            continue
+        chunks.append(current)
+        i += 1
+    return ", ".join(chunks) if len(chunks) > 1 else value
 
 
 def _step_note(output: str) -> str:

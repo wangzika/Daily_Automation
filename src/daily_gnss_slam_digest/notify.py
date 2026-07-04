@@ -240,7 +240,7 @@ def quick_command_templates() -> str:
             "",
             "3. 只生成一篇重点论文解读",
             "主题：论文指令：只解读论文",
-            "关键词：GNSS timing spoofing protection level",
+            "关键词：GNSS timing, spoofing, protection level",
             "任务：解读",
             "模式：draft",
             "数量：3",
