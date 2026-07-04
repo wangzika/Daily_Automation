@@ -179,6 +179,8 @@ def main(argv: list[str] | None = None) -> int:
                         "title": title,
                         "media_id": media_id,
                         "source_url": paper.get("url"),
+                        "pdf_url": paper.get("pdf_url"),
+                        "code_url": _paper_code_url(paper),
                         "html_path": str(html_path),
                         "md_path": str(md_path),
                         "content_mode": text_polish.mode,
@@ -294,8 +296,15 @@ def _notify_deepdive_drafts_created(
                 f"   media_id：{draft['media_id']}",
                 f"   内容模式：{_content_mode_label(str(draft.get('content_mode') or 'fallback'))}",
                 f"   配图模式：{draft.get('image_mode') or '论文原图'}",
+                "   解读下载：",
+                f"   - HTML版：{_file_url(str(draft.get('html_path') or ''))}",
+                f"   - Markdown版：{_file_url(str(draft.get('md_path') or ''))}",
             ]
         )
+        source_lines = _draft_source_lines(draft)
+        if source_lines:
+            lines.append("   阅读原文：")
+            lines.extend(f"   - {line}" for line in source_lines)
         reason = str(draft.get("content_reason") or "")
         if draft.get("content_mode") != "api" and reason:
             lines.append(f"   回退原因：{reason}")
@@ -324,6 +333,27 @@ def _content_mode_label(mode: str) -> str:
     return "传统回退"
 
 
+def _file_url(path_text: str) -> str:
+    if not path_text:
+        return ""
+    try:
+        path = Path(path_text)
+        if not path.is_absolute():
+            path = Path.cwd() / path
+        return path.resolve().as_uri()
+    except ValueError:
+        return path_text
+
+
+def _draft_source_lines(draft: dict[str, Any]) -> list[str]:
+    lines: list[str] = []
+    for label, key in (("原文页面", "source_url"), ("PDF下载", "pdf_url"), ("代码/项目", "code_url")):
+        url = str(draft.get(key) or "").strip()
+        if url:
+            lines.append(f"{label}：{url}")
+    return lines
+
+
 def build_deepdive_markdown(
     paper: dict[str, Any],
     reading: PaperReading,
@@ -341,6 +371,10 @@ def build_deepdive_markdown(
         f"- 论文作者：{_authors(paper)}",
         f"- 日期：{paper.get('published', '')[:10]}",
         f"- 原文：{paper.get('url', '')}",
+        "",
+        "## 阅读原文",
+        "",
+        *_source_links_markdown(paper),
         "",
         "## 一句话读懂",
         "",
@@ -412,6 +446,8 @@ def build_deepdive_html(
         f"日期：{html.escape(str(paper.get('published', ''))[:10])}<br/>",
         f'原文：<a href="{html.escape(paper.get("url", ""))}" style="color:#0b9984;text-decoration:none;">{html.escape(paper.get("url", ""))}</a>',
         "</section>",
+        _section_title("阅读原文"),
+        _source_links_html(paper),
         _section_title("一句话读懂"),
         _paragraph(_polished_text(text_polish, "one_sentence", _one_sentence(paper, reading))),
         _section_title("读前抓手"),
@@ -454,6 +490,58 @@ def _image_note(figures: list[DeepDiveFigure]) -> str:
     if any(figure.source == "ai" for figure in figures):
         return "主图为辅助示意图，论文原图来自 PDF；图片仅用于论文解读和学术讨论，正式转载前建议核对论文许可和作者要求。"
     return "图像来自论文 PDF，仅用于论文解读和学术讨论，正式转载前建议核对论文许可和作者要求。"
+
+
+def _source_links(paper: dict[str, Any]) -> list[tuple[str, str]]:
+    links: list[tuple[str, str]] = []
+    for label, value in (
+        ("原文页面", paper.get("url")),
+        ("PDF下载", paper.get("pdf_url")),
+        ("代码/项目", _paper_code_url(paper)),
+    ):
+        url = str(value or "").strip()
+        if url and url not in {item[1] for item in links}:
+            links.append((label, url))
+    return links
+
+
+def _source_links_markdown(paper: dict[str, Any]) -> list[str]:
+    links = _source_links(paper)
+    if not links:
+        return ["- 暂无可跳转的原文链接，请回到论文列表核对。"]
+    return [f"- [{label}]({url})" for label, url in links]
+
+
+def _source_links_html(paper: dict[str, Any]) -> str:
+    links = _source_links(paper)
+    if not links:
+        return _paragraph("暂无可跳转的原文链接，请回到论文列表核对。")
+    cards = []
+    for label, url in links:
+        cards.append(
+            '<p style="margin:8px 0 0;color:#40545c;font-size:14px;line-height:1.8;">'
+            f'<a href="{html.escape(url)}" style="color:#0b9984;text-decoration:none;">{html.escape(label)}：{html.escape(url)}</a>'
+            "</p>"
+        )
+    return (
+        '<section style="margin:0 0 16px;padding:13px 14px;background:#f7fbfb;'
+        'border:1px solid #e0eeee;border-radius:8px;">'
+        + "".join(cards)
+        + "</section>"
+    )
+
+
+def _paper_code_url(paper: dict[str, Any]) -> str:
+    direct = str(paper.get("code_url") or "").strip()
+    if direct:
+        return direct
+    signals = paper.get("quality_signals") or {}
+    if isinstance(signals, dict):
+        for key in ("code_url", "github_url", "project_url"):
+            value = str(signals.get(key) or "").strip()
+            if value:
+                return value
+    return ""
 
 
 def _download(url: str, output: Path) -> None:

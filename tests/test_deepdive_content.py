@@ -12,8 +12,10 @@ from daily_gnss_slam_digest.deepdive import (
     TextPolishResult,
     _content_mode_label,
     _display_figure_caption,
+    _draft_source_lines,
     _extract_base64_image,
     _figure_reading,
+    _file_url,
     _image_variants,
     _prepare_article_figures,
     build_deepdive_html,
@@ -172,6 +174,49 @@ class DeepDiveContentTest(unittest.TestCase):
 
         self.assertIn("润色后的一句话。", markdown)
         self.assertEqual(_content_mode_label("api"), "API 润色")
+
+    def test_article_includes_read_original_links(self) -> None:
+        paper = {
+            "title": "GNSS Timing Spoofing Protection Level",
+            "authors": ["A. Reader"],
+            "abstract": "This paper studies timing protection levels for GNSS spoofing.",
+            "published": "2026-07-01T00:00:00+00:00",
+            "url": "https://arxiv.org/abs/2607.00001",
+            "pdf_url": "https://arxiv.org/pdf/2607.00001",
+            "quality_signals": {"code_url": "https://github.com/example/tpl"},
+            "matched_terms": ["gnss", "spoofing"],
+        }
+        reading = PaperReading(str(paper["abstract"]), "", "", "", "", ())
+
+        markdown = build_deepdive_markdown(paper, reading, [], {})
+        html = build_deepdive_html(paper, reading, [], {})
+
+        for text in (markdown, html):
+            self.assertIn("阅读原文", text)
+            self.assertIn("原文页面", text)
+            self.assertIn("PDF下载", text)
+            self.assertIn("代码/项目", text)
+            self.assertIn("https://arxiv.org/pdf/2607.00001", text)
+            self.assertIn("https://github.com/example/tpl", text)
+
+    def test_draft_email_links_include_outputs_and_source_downloads(self) -> None:
+        source_lines = _draft_source_lines(
+            {
+                "source_url": "https://arxiv.org/abs/2607.00001",
+                "pdf_url": "https://arxiv.org/pdf/2607.00001",
+                "code_url": "https://github.com/example/tpl",
+            }
+        )
+
+        self.assertEqual(
+            source_lines,
+            [
+                "原文页面：https://arxiv.org/abs/2607.00001",
+                "PDF下载：https://arxiv.org/pdf/2607.00001",
+                "代码/项目：https://github.com/example/tpl",
+            ],
+        )
+        self.assertTrue(_file_url("outputs/deepdives/example/article.html").startswith("file://"))
 
 
 if __name__ == "__main__":
