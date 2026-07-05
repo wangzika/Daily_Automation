@@ -4,7 +4,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     issue_date = date.fromisoformat(args.issue_date) if args.issue_date else date.today()
     keywords = parse_keyword_text(args.keywords)
     focus_topic = ""
+    next_focus_topic = ""
     fallback_queries: list[str] = []
     fallback_topics = ROTATING_TOPICS
     arxiv_failed = False
@@ -52,6 +53,7 @@ def main(argv: list[str] | None = None) -> int:
         scoring_topics = (rotating_topic,)
         fallback_queries = [topic.query for topic in ROTATING_TOPICS]
         focus_topic = rotating_topic.cn_name
+        next_focus_topic = rotating_topic_for_date(issue_date + timedelta(days=1)).cn_name
         print(f"Using rotating daily topic: {rotating_topic.cn_name} ({rotating_topic.name})")
     else:
         search_queries = [topic.query for topic in TOPICS]
@@ -220,6 +222,7 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=args.output_dir,
         image_paths=local_image_paths,
         focus_topic=focus_topic,
+        next_focus_topic=next_focus_topic,
     )
     print(f"Wrote markdown: {paths['markdown']}")
     print(f"Wrote html: {paths['html']}")
@@ -243,7 +246,13 @@ def main(argv: list[str] | None = None) -> int:
             key: publisher.upload_article_image(access_token, path)
             for key, path in asset_paths.items()
         }
-        html_content = build_html(recommendations, issue_date, image_urls=article_image_urls, focus_topic=focus_topic)
+        html_content = build_html(
+            recommendations,
+            issue_date,
+            image_urls=article_image_urls,
+            focus_topic=focus_topic,
+            next_focus_topic=next_focus_topic,
+        )
         media_id = publisher.add_draft(
             access_token=access_token,
             title=title,

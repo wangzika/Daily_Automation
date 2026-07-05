@@ -48,6 +48,36 @@ class TopicRotationTest(unittest.TestCase):
         self.assertNotIn("基于公开论文元数据生成", markdown)
         self.assertNotIn("基于公开论文元数据生成", html)
 
+    def test_tomorrow_keywords_use_next_rotation_topic(self) -> None:
+        ranked = recommend(
+            SAMPLE_PAPERS,
+            limit=3,
+            days_back=800,
+            now=datetime(2026, 7, 6, tzinfo=timezone.utc),
+        )
+        monday_topic = rotating_topic_for_date(date(2026, 7, 6))
+        tuesday_topic = rotating_topic_for_date(date(2026, 7, 7))
+
+        markdown = build_markdown(
+            ranked,
+            date(2026, 7, 6),
+            focus_topic=monday_topic.cn_name,
+            next_focus_topic=tuesday_topic.cn_name,
+        )
+        html = build_html(
+            ranked,
+            date(2026, 7, 6),
+            focus_topic=monday_topic.cn_name,
+            next_focus_topic=tuesday_topic.cn_name,
+        )
+
+        self.assertIn("今天这期看 **具身导航与机器人基础模型**", markdown)
+        self.assertIn("`Gaussian Splatting SLAM`", markdown)
+        self.assertIn("`3D Gaussian Splatting mapping`", markdown)
+        self.assertNotIn("`embodied navigation`", markdown)
+        self.assertIn("Gaussian Splatting SLAM", html)
+        self.assertIn("3D Gaussian Splatting mapping", html)
+
     def test_from_json_rerender_keeps_only_current_topic_matches(self) -> None:
         published = datetime(2026, 7, 4, tzinfo=timezone.utc)
         loaded = [

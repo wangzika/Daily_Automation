@@ -15,11 +15,12 @@ def build_markdown(
     issue_date: date,
     image_paths: Mapping[str, str] | None = None,
     focus_topic: str = "",
+    next_focus_topic: str = "",
 ) -> str:
     title = build_title(issue_date)
     image_paths = image_paths or {}
     focus_topic = focus_topic or "GNSS 欺骗/干扰检测、多模态融合定位、SLAM 与鲁棒里程计"
-    suggested_terms = _suggested_terms_for_focus(focus_topic)
+    suggested_terms = _suggested_terms_for_focus(next_focus_topic or focus_topic)
     lines: list[str] = [
         f"# {title}",
         "",
@@ -89,11 +90,12 @@ def build_html(
     issue_date: date,
     image_urls: Mapping[str, str] | None = None,
     focus_topic: str = "",
+    next_focus_topic: str = "",
 ) -> str:
     title = build_title(issue_date)
     image_urls = image_urls or {}
     focus_topic = focus_topic or "GNSS 欺骗/干扰检测、多模态融合定位、SLAM 与鲁棒里程计"
-    suggested_terms = _suggested_terms_for_focus(focus_topic)
+    suggested_terms = _suggested_terms_for_focus(next_focus_topic or focus_topic)
 
     body_parts: list[str] = []
     if "header" in image_urls:
@@ -154,6 +156,7 @@ def write_outputs(
     output_dir: Path,
     image_paths: Mapping[str, str] | None = None,
     focus_topic: str = "",
+    next_focus_topic: str = "",
 ) -> dict[str, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = f"{issue_date.isoformat()}-gnss-slam-digest"
@@ -162,11 +165,23 @@ def write_outputs(
     json_path = output_dir / f"{stem}.json"
 
     markdown_path.write_text(
-        build_markdown(recommendations, issue_date, image_paths=image_paths, focus_topic=focus_topic),
+        build_markdown(
+            recommendations,
+            issue_date,
+            image_paths=image_paths,
+            focus_topic=focus_topic,
+            next_focus_topic=next_focus_topic,
+        ),
         encoding="utf-8",
     )
     html_path.write_text(
-        build_html(recommendations, issue_date, image_urls=image_paths, focus_topic=focus_topic),
+        build_html(
+            recommendations,
+            issue_date,
+            image_urls=image_paths,
+            focus_topic=focus_topic,
+            next_focus_topic=next_focus_topic,
+        ),
         encoding="utf-8",
     )
     json_path.write_text(_to_json(recommendations), encoding="utf-8")
