@@ -2233,7 +2233,7 @@ def _request_siliconflow_text_polish(api_key: str, paper: dict[str, Any], texts:
         "messages": [
             {
                 "role": "system",
-                "content": "你是中文科技公众号编辑，只返回合法 JSON 对象。",
+                "content": "你是中文科技公众号编辑，只返回合法 JSON 对象，不输出思考过程。",
             },
             {
                 "role": "user",
@@ -2291,7 +2291,7 @@ def _request_ollama_text_polish_batch(paper: dict[str, Any], texts: dict[str, st
         "messages": [
             {
                 "role": "system",
-                "content": "你是中文科技公众号编辑，只返回合法 JSON 对象。",
+                "content": "你是中文科技公众号编辑，只返回合法 JSON 对象，不输出思考过程。",
             },
             {
                 "role": "user",
@@ -2301,8 +2301,12 @@ def _request_ollama_text_polish_batch(paper: dict[str, Any], texts: dict[str, st
         "stream": False,
         "options": {
             "temperature": float(os.getenv("OLLAMA_TEXT_TEMPERATURE", "0.2")),
+            "num_predict": _ollama_text_num_predict(),
         },
     }
+    keep_alive = os.getenv("OLLAMA_KEEP_ALIVE", "").strip()
+    if keep_alive:
+        body["keep_alive"] = keep_alive
     if os.getenv("OLLAMA_TEXT_FORMAT_JSON", "1").lower() in {"1", "true", "yes", "on"}:
         body["format"] = "json"
     request = urllib.request.Request(
@@ -2338,7 +2342,7 @@ def _siliconflow_text_model() -> str:
 
 
 def _ollama_text_model() -> str:
-    return os.getenv("OLLAMA_TEXT_MODEL", "qwen2.5:3b").strip() or "qwen2.5:3b"
+    return os.getenv("OLLAMA_TEXT_MODEL", "qwen3:8b").strip() or "qwen3:8b"
 
 
 def _ollama_text_batch_size() -> int:
@@ -2347,6 +2351,14 @@ def _ollama_text_batch_size() -> int:
     except ValueError:
         return 4
     return min(max(value, 1), 20)
+
+
+def _ollama_text_num_predict() -> int:
+    try:
+        value = int(os.getenv("OLLAMA_TEXT_NUM_PREDICT", "1024"))
+    except ValueError:
+        return 1024
+    return max(value, 128)
 
 
 def _text_polish_prompt(paper: dict[str, Any], texts: dict[str, str]) -> str:

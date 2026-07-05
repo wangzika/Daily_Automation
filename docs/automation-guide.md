@@ -348,12 +348,14 @@ SILICONFLOW_TEXT_RESPONSE_FORMAT=0
 ```env
 DEEPDIVE_TEXT_POLISH_MODE=ollama
 OLLAMA_BASE_URL=http://127.0.0.1:11434
-OLLAMA_TEXT_MODEL=qwen2.5:3b
+OLLAMA_TEXT_MODEL=qwen3:8b
+OLLAMA_TEXT_NUM_PREDICT=1024
+OLLAMA_KEEP_ALIVE=10m
 OLLAMA_TEXT_FORMAT_JSON=1
 OLLAMA_TEXT_BATCH_SIZE=4
 ```
 
-`OLLAMA_TEXT_BATCH_SIZE` 控制本地模型每次润色多少段正文。Mac 本地模型建议保持 `3-5`，太大会更容易超时；太小会更稳但总耗时更长。默认使用 `qwen2.5:3b`，更适合日常兜底；如果机器内存和时间都充足，可以改成 `qwen2.5:7b`。
+`OLLAMA_TEXT_BATCH_SIZE` 控制本地模型每次润色多少段正文。Mac 本地模型建议保持 `3-5`，太大会更容易超时；太小会更稳但总耗时更长。默认使用 `qwen3:8b`，文风和理解能力更好；如果想要更快的日常兜底，可以改成 `qwen2.5:3b`。`OLLAMA_TEXT_NUM_PREDICT` 用来限制单次生成长度，`OLLAMA_KEEP_ALIVE` 可以让模型短时间驻留内存，连续生成多篇时会少一些重复加载成本。
 
 只生成本周热点汇总：
 
