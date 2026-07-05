@@ -1,0 +1,151 @@
+{
+  "articles": [
+    "outputs/deepdives/01-2606.25699/article-paper.html",
+    "outputs/deepdives/01-2606.25699/article-ai.html",
+    "outputs/deepdives/02-2606.29875/article-paper.html",
+    "outputs/deepdives/02-2606.29875/article-ai.html",
+    "outputs/deepdives/03-2606.26010/article-paper.html",
+    "outputs/deepdives/03-2606.26010/article-ai.html"
+  ],
+  "articles_detail": [
+    {
+      "variant": "paper",
+      "html_path": "outputs/deepdives/01-2606.25699/article-paper.html",
+      "md_path": "outputs/deepdives/01-2606.25699/article-paper.md",
+      "content_mode": "fallback",
+      "content_reason": "Gemini text API HTTP 503: { \"error\": { \"code\": 503, \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Ple...",
+      "image_mode": "论文原图 + 实验组合图"
+    },
+    {
+      "variant": "ai",
+      "html_path": "outputs/deepdives/01-2606.25699/article-ai.html",
+      "md_path": "outputs/deepdives/01-2606.25699/article-ai.md",
+      "content_mode": "api",
+      "content_reason": "Gemini text model: gemini-2.5-flash",
+      "image_mode": "AI 不可用，已回退论文图 + 实验组合图"
+    },
+    {
+      "variant": "paper",
+      "html_path": "outputs/deepdives/02-2606.29875/article-paper.html",
+      "md_path": "outputs/deepdives/02-2606.29875/article-paper.md",
+      "content_mode": "fallback",
+      "content_reason": "Gemini text API HTTP 503: { \"error\": { \"code\": 503, \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Ple...",
+      "image_mode": "论文原图 + 实验组合图"
+    },
+    {
+      "variant": "ai",
+      "html_path": "outputs/deepdives/02-2606.29875/article-ai.html",
+      "md_path": "outputs/deepdives/02-2606.29875/article-ai.md",
+      "content_mode": "fallback",
+      "content_reason": "Gemini text API HTTP 503: { \"error\": { \"code\": 503, \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Ple...",
+      "image_mode": "AI 不可用，已回退论文图 + 实验组合图"
+    },
+    {
+      "variant": "paper",
+      "html_path": "outputs/deepdives/03-2606.26010/article-paper.html",
+      "md_path": "outputs/deepdives/03-2606.26010/article-paper.md",
+      "content_mode": "api",
+      "content_reason": "Gemini text model: gemini-2.5-flash",
+      "image_mode": "论文原图"
+    },
+    {
+      "variant": "ai",
+      "html_path": "outputs/deepdives/03-2606.26010/article-ai.html",
+      "md_path": "outputs/deepdives/03-2606.26010/article-ai.md",
+      "content_mode": "api",
+      "content_reason": "Gemini text model: gemini-2.5-flash",
+      "image_mode": "AI 不可用，已回退论文图"
+    }
+  ],
+  "draft_media_ids": [
+    "OzDw82ZGuV7j2GWA35lmhtKX3wZ2Ga-clrXmv5GONuL-FOTSlUn2mgixNoqhIVu3",
+    "OzDw82ZGuV7j2GWA35lmhl9Yt0GGlZy8XEjbfojQG4E3ANg6xTWI0Fu4seD7FRA0",
+    "OzDw82ZGuV7j2GWA35lmhsfMOTPgb7VK4-3VwdsNJb9ssS4emmeBVExBccgpfyUV",
+    "OzDw82ZGuV7j2GWA35lmhrhqrNMxcU7Rw9k94VUfRYV47r_LG36_OZ3gdAvS2t3L",
+    "OzDw82ZGuV7j2GWA35lmhoVrszWWjRtZ4YD_2vm8nL3BXpMzKbc7-UeaxuxwPIUy",
+    "OzDw82ZGuV7j2GWA35lmhlAwjSpn_QM0NPtVbMvtaNkbZcUCY_fm8HKgOgmtHUoW"
+  ],
+  "cover_media_ids": [
+    "OzDw82ZGuV7j2GWA35lmhhWZ4BqXa-k6H4YWRzzkEQKak9Vz6L4ehgxFn7DH1JQr",
+    "OzDw82ZGuV7j2GWA35lmhj_T5yvsTrPE8FW3I4gb4NuGPlWltkSRpVKJQa7lM1qL",
+    "OzDw82ZGuV7j2GWA35lmhupMdRNZLx2UMNXvZmCZaDOSAmkNCyTvZs2oXIU3GQxO",
+    "OzDw82ZGuV7j2GWA35lmhhi76OhrHcXWl4uA_ZlS93B6U1ilv3QjHqvUczz9aSzG",
+    "OzDw82ZGuV7j2GWA35lmhpP7qAaBZcdODB_m71iu2FIJ9Fh0nEUbymrfZcz2CUCL",
+    "OzDw82ZGuV7j2GWA35lmhgTLTE3JXnOr9_kOuXVzCziCpbNSeuFZ1pgf67tMbhxS"
+  ],
+  "drafts": [
+    {
+      "title": "论文解读｜SA-LIVO: Efficient LiDAR-I...",
+      "media_id": "OzDw82ZGuV7j2GWA35lmhtKX3wZ2Ga-clrXmv5GONuL-FOTSlUn2mgixNoqhIVu3",
+      "source_url": "http://arxiv.org/abs/2606.25699v1",
+      "pdf_url": "https://arxiv.org/pdf/2606.25699v1",
+      "code_url": "",
+      "html_path": "outputs/deepdives/01-2606.25699/article-paper.html",
+      "md_path": "outputs/deepdives/01-2606.25699/article-paper.md",
+      "content_mode": "fallback",
+      "content_reason": "Gemini text API HTTP 503: { \"error\": { \"code\": 503, \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Ple...",
+      "image_mode": "论文原图 + 实验组合图"
+    },
+    {
+      "title": "论文解读｜SA-LIVO: Efficient LiDAR-I...",
+      "media_id": "OzDw82ZGuV7j2GWA35lmhl9Yt0GGlZy8XEjbfojQG4E3ANg6xTWI0Fu4seD7FRA0",
+      "source_url": "http://arxiv.org/abs/2606.25699v1",
+      "pdf_url": "https://arxiv.org/pdf/2606.25699v1",
+      "code_url": "",
+      "html_path": "outputs/deepdives/01-2606.25699/article-ai.html",
+      "md_path": "outputs/deepdives/01-2606.25699/article-ai.md",
+      "content_mode": "api",
+      "content_reason": "Gemini text model: gemini-2.5-flash",
+      "image_mode": "AI 不可用，已回退论文图 + 实验组合图"
+    },
+    {
+      "title": "论文解读｜AUSLUN: A Fixed-Hover UAV...",
+      "media_id": "OzDw82ZGuV7j2GWA35lmhsfMOTPgb7VK4-3VwdsNJb9ssS4emmeBVExBccgpfyUV",
+      "source_url": "http://arxiv.org/abs/2606.29875v1",
+      "pdf_url": "https://arxiv.org/pdf/2606.29875v1",
+      "code_url": "https://github.com/xirhxq/pod_search",
+      "html_path": "outputs/deepdives/02-2606.29875/article-paper.html",
+      "md_path": "outputs/deepdives/02-2606.29875/article-paper.md",
+      "content_mode": "fallback",
+      "content_reason": "Gemini text API HTTP 503: { \"error\": { \"code\": 503, \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Ple...",
+      "image_mode": "论文原图 + 实验组合图"
+    },
+    {
+      "title": "论文解读｜AUSLUN: A Fixed-Hover UAV...",
+      "media_id": "OzDw82ZGuV7j2GWA35lmhrhqrNMxcU7Rw9k94VUfRYV47r_LG36_OZ3gdAvS2t3L",
+      "source_url": "http://arxiv.org/abs/2606.29875v1",
+      "pdf_url": "https://arxiv.org/pdf/2606.29875v1",
+      "code_url": "https://github.com/xirhxq/pod_search",
+      "html_path": "outputs/deepdives/02-2606.29875/article-ai.html",
+      "md_path": "outputs/deepdives/02-2606.29875/article-ai.md",
+      "content_mode": "fallback",
+      "content_reason": "Gemini text API HTTP 503: { \"error\": { \"code\": 503, \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Ple...",
+      "image_mode": "AI 不可用，已回退论文图 + 实验组合图"
+    },
+    {
+      "title": "论文解读｜FAR-LIO: Enabling High-Spe...",
+      "media_id": "OzDw82ZGuV7j2GWA35lmhoVrszWWjRtZ4YD_2vm8nL3BXpMzKbc7-UeaxuxwPIUy",
+      "source_url": "http://arxiv.org/abs/2606.26010v1",
+      "pdf_url": "https://arxiv.org/pdf/2606.26010v1",
+      "code_url": "https://github.com/TUMFTM/FAR-LIO",
+      "html_path": "outputs/deepdives/03-2606.26010/article-paper.html",
+      "md_path": "outputs/deepdives/03-2606.26010/article-paper.md",
+      "content_mode": "api",
+      "content_reason": "Gemini text model: gemini-2.5-flash",
+      "image_mode": "论文原图"
+    },
+    {
+      "title": "论文解读｜FAR-LIO: Enabling High-Spe...",
+      "media_id": "OzDw82ZGuV7j2GWA35lmhlAwjSpn_QM0NPtVbMvtaNkbZcUCY_fm8HKgOgmtHUoW",
+      "source_url": "http://arxiv.org/abs/2606.26010v1",
+      "pdf_url": "https://arxiv.org/pdf/2606.26010v1",
+      "code_url": "https://github.com/TUMFTM/FAR-LIO",
+      "html_path": "outputs/deepdives/03-2606.26010/article-ai.html",
+      "md_path": "outputs/deepdives/03-2606.26010/article-ai.md",
+      "content_mode": "api",
+      "content_reason": "Gemini text model: gemini-2.5-flash",
+      "image_mode": "AI 不可用，已回退论文图"
+    }
+  ],
+  "publish_results": []
+}

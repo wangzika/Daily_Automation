@@ -1,7 +1,9 @@
 {
-  "paper_count": 5,
+  "paper_count": 12,
   "source_dates": [
-    "2026-07-03"
+    "2026-07-03",
+    "2026-07-04",
+    "2026-07-05"
   ],
   "hot_topics": [
     [
@@ -9,7 +11,15 @@
       4
     ],
     [
+      "退化场景多模态融合与鲁棒里程计",
+      4
+    ],
+    [
       "多模态/多传感器融合",
+      3
+    ],
+    [
+      "韧性 PNT 与 GNSS 抗欺骗抗干扰",
       3
     ],
     [
@@ -20,14 +30,26 @@
   "hot_terms": [
     [
       "odometry",
-      4
+      8
+    ],
+    [
+      "gnss",
+      6
     ],
     [
       "loop",
       4
     ],
     [
-      "gnss",
+      "robust",
+      4
+    ],
+    [
+      "spoofing",
+      3
+    ],
+    [
+      "fusion",
       3
     ],
     [
@@ -43,6 +65,22 @@
       3
     ],
     [
+      "visual-inertial",
+      3
+    ],
+    [
+      "gps",
+      2
+    ],
+    [
+      "interference",
+      2
+    ],
+    [
+      "integrity",
+      2
+    ],
+    [
       "camera",
       2
     ],
@@ -51,63 +89,39 @@
       2
     ],
     [
-      "gaussian",
+      "degeneracy",
       2
-    ],
-    [
-      "inertial",
-      2
-    ],
-    [
-      "gps",
-      1
-    ],
-    [
-      "spoofing",
-      1
-    ],
-    [
-      "jamming",
-      1
-    ],
-    [
-      "interference",
-      1
-    ],
-    [
-      "integrity",
-      1
-    ],
-    [
-      "detection",
-      1
     ]
   ],
   "hot_directions": [
     [
       "SLAM/里程计鲁棒性",
-      4
-    ],
-    [
-      "多模态融合与传感器退化处理",
-      3
+      8
     ],
     [
       "可复现代码与开源实现",
-      3
+      6
+    ],
+    [
+      "多模态融合与传感器退化处理",
+      5
     ],
     [
       "GNSS 完整性与欺骗/干扰检测",
-      1
+      4
     ],
     [
       "数据集与 benchmark",
-      1
+      4
     ]
   ],
   "hot_robotics_trends": [
     [
       "退化场景多模态融合与鲁棒里程计",
+      8
+    ],
+    [
+      "韧性 PNT 与 GNSS 抗欺骗抗干扰",
       4
     ],
     [
@@ -117,10 +131,6 @@
     [
       "多机器人协同 SLAM 与分布式建图",
       4
-    ],
-    [
-      "韧性 PNT 与 GNSS 抗欺骗抗干扰",
-      1
     ]
   ],
   "top_papers": [
@@ -179,6 +189,27 @@
       "source_date": "2026-07-03"
     },
     {
+      "title": "Efficient Network Inference via Hardware-Aware Architecture Search, Model Pruning & Quantization",
+      "url": "http://arxiv.org/abs/2606.23210v1",
+      "published": "2026-06-22",
+      "score": 40.18,
+      "quality_score": 8.5,
+      "quality_signals": {
+        "venue": "NAVIGATION",
+        "venue_bonus": 6.0,
+        "dataset_signal": true
+      },
+      "quality_summary": "质量分 8.5；venue NAVIGATION；数据集/benchmark",
+      "topics": [
+        "韧性 PNT 与 GNSS 抗欺骗抗干扰"
+      ],
+      "matched_terms": [
+        "gnss",
+        "interference"
+      ],
+      "source_date": "2026-07-04"
+    },
+    {
       "title": "LXD-SLAM: LiDAR+X Dense SLAM with $\\sum_{i=0}^{5}C_5^i$ Configurable Sensor Combinations",
       "url": "http://arxiv.org/abs/2606.27811v1",
       "published": "2026-06-26",
@@ -214,50 +245,93 @@
       "source_date": "2026-07-03"
     },
     {
-      "title": "GNSS Jamming Detection with Automatic Gain Control (AGC) and Carrier-to-Noise Ratio Density (CNO) Observables from a COTS receiver",
-      "url": "http://arxiv.org/abs/2602.12688v1",
-      "published": "2026-02-13",
-      "score": 56.04,
-      "quality_score": 0.0,
+      "title": "GNSS Spoofing Threat for V2X communications",
+      "url": "http://arxiv.org/abs/2606.20215v1",
+      "published": "2026-06-18",
+      "score": 51.84,
+      "quality_score": 8.0,
       "quality_signals": {
-        "venue": "7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany"
+        "venue": "NAVIGATION",
+        "venue_bonus": 6.0,
+        "real_world_signal": true
       },
-      "quality_summary": "质量分 0.0；venue 7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany",
+      "quality_summary": "质量分 8.0；venue NAVIGATION；真实实验",
       "topics": [
-        "GNSS 欺骗与干扰检测"
+        "韧性 PNT 与 GNSS 抗欺骗抗干扰"
+      ],
+      "matched_terms": [
+        "pnt",
+        "gnss",
+        "gps",
+        "spoofing"
+      ],
+      "source_date": "2026-07-04"
+    },
+    {
+      "title": "FAR-LIO: Enabling High-Speed Autonomy through Fast, Accurate, and Robust LiDAR-Inertial Odometry",
+      "url": "http://arxiv.org/abs/2606.26010v1",
+      "published": "2026-06-24",
+      "score": 48.96,
+      "quality_score": 6.0,
+      "quality_signals": {
+        "code_url": "https://github.com/TUMFTM/FAR-LIO"
+      },
+      "quality_summary": "质量分 6.0；代码开源",
+      "topics": [
+        "退化场景多模态融合与鲁棒里程计"
+      ],
+      "matched_terms": [
+        "robust",
+        "odometry",
+        "lidar-inertial",
+        "lio"
+      ],
+      "source_date": "2026-07-05"
+    },
+    {
+      "title": "A Conditional Timing Protection Level: Holdover-Limited Undetected Time Error Under GNSS Spoofing",
+      "url": "http://arxiv.org/abs/2606.24210v1",
+      "published": "2026-06-23",
+      "score": 46.36,
+      "quality_score": 5.5,
+      "quality_signals": {
+        "code_signal": true,
+        "dataset_signal": true
+      },
+      "quality_summary": "质量分 5.5；有代码线索；数据集/benchmark",
+      "topics": [
+        "韧性 PNT 与 GNSS 抗欺骗抗干扰"
       ],
       "matched_terms": [
         "gnss",
-        "gps",
         "spoofing",
-        "jamming",
-        "interference",
-        "integrity",
-        "detection",
-        "receiver"
+        "integrity"
       ],
-      "source_date": "2026-07-03"
+      "source_date": "2026-07-04"
     },
     {
-      "title": "Self-supervised Geometry Reasoning for LiDAR Simultaneous Localization and Mapping",
-      "url": "http://arxiv.org/abs/2606.30166v1",
-      "published": "2026-06-29",
-      "score": 51.43,
-      "quality_score": 0.0,
-      "quality_signals": {},
-      "quality_summary": "质量分 0.0；暂无外部质量元数据",
+      "title": "SA-LIVO: Efficient LiDAR-Inertial-Visual Odometry with Subspace-Aware Degeneracy Handling",
+      "url": "http://arxiv.org/abs/2606.25699v1",
+      "published": "2026-06-24",
+      "score": 70.91,
+      "quality_score": 3.0,
+      "quality_signals": {
+        "code_signal": true
+      },
+      "quality_summary": "质量分 3.0；有代码线索",
       "topics": [
-        "SLAM 与鲁棒里程计"
+        "退化场景多模态融合与鲁棒里程计"
       ],
       "matched_terms": [
-        "slam",
         "odometry",
-        "localization",
-        "mapping",
-        "loop",
-        "gaussian"
+        "lidar-inertial",
+        "visual-inertial",
+        "livo",
+        "fusion",
+        "degeneracy",
+        "degradation"
       ],
-      "source_date": "2026-07-03"
+      "source_date": "2026-07-05"
     }
   ],
   "code_papers": [
@@ -349,6 +423,48 @@
         "gaussian"
       ],
       "source_date": "2026-07-03"
+    },
+    {
+      "title": "FAR-LIO: Enabling High-Speed Autonomy through Fast, Accurate, and Robust LiDAR-Inertial Odometry",
+      "url": "http://arxiv.org/abs/2606.26010v1",
+      "published": "2026-06-24",
+      "score": 48.96,
+      "quality_score": 6.0,
+      "quality_signals": {
+        "code_url": "https://github.com/TUMFTM/FAR-LIO"
+      },
+      "quality_summary": "质量分 6.0；代码开源",
+      "topics": [
+        "退化场景多模态融合与鲁棒里程计"
+      ],
+      "matched_terms": [
+        "robust",
+        "odometry",
+        "lidar-inertial",
+        "lio"
+      ],
+      "source_date": "2026-07-05"
+    },
+    {
+      "title": "A Conditional Timing Protection Level: Holdover-Limited Undetected Time Error Under GNSS Spoofing",
+      "url": "http://arxiv.org/abs/2606.24210v1",
+      "published": "2026-06-23",
+      "score": 46.36,
+      "quality_score": 5.5,
+      "quality_signals": {
+        "code_signal": true,
+        "dataset_signal": true
+      },
+      "quality_summary": "质量分 5.5；有代码线索；数据集/benchmark",
+      "topics": [
+        "韧性 PNT 与 GNSS 抗欺骗抗干扰"
+      ],
+      "matched_terms": [
+        "gnss",
+        "spoofing",
+        "integrity"
+      ],
+      "source_date": "2026-07-04"
     }
   ],
   "venue_papers": [
@@ -381,29 +497,48 @@
       "source_date": "2026-07-03"
     },
     {
-      "title": "GNSS Jamming Detection with Automatic Gain Control (AGC) and Carrier-to-Noise Ratio Density (CNO) Observables from a COTS receiver",
-      "url": "http://arxiv.org/abs/2602.12688v1",
-      "published": "2026-02-13",
-      "score": 56.04,
-      "quality_score": 0.0,
+      "title": "Efficient Network Inference via Hardware-Aware Architecture Search, Model Pruning & Quantization",
+      "url": "http://arxiv.org/abs/2606.23210v1",
+      "published": "2026-06-22",
+      "score": 40.18,
+      "quality_score": 8.5,
       "quality_signals": {
-        "venue": "7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany"
+        "venue": "NAVIGATION",
+        "venue_bonus": 6.0,
+        "dataset_signal": true
       },
-      "quality_summary": "质量分 0.0；venue 7th SmartRacon scientific seminar, Oct 2025, Stuttgart, Germany",
+      "quality_summary": "质量分 8.5；venue NAVIGATION；数据集/benchmark",
       "topics": [
-        "GNSS 欺骗与干扰检测"
+        "韧性 PNT 与 GNSS 抗欺骗抗干扰"
       ],
       "matched_terms": [
         "gnss",
-        "gps",
-        "spoofing",
-        "jamming",
-        "interference",
-        "integrity",
-        "detection",
-        "receiver"
+        "interference"
       ],
-      "source_date": "2026-07-03"
+      "source_date": "2026-07-04"
+    },
+    {
+      "title": "GNSS Spoofing Threat for V2X communications",
+      "url": "http://arxiv.org/abs/2606.20215v1",
+      "published": "2026-06-18",
+      "score": 51.84,
+      "quality_score": 8.0,
+      "quality_signals": {
+        "venue": "NAVIGATION",
+        "venue_bonus": 6.0,
+        "real_world_signal": true
+      },
+      "quality_summary": "质量分 8.0；venue NAVIGATION；真实实验",
+      "topics": [
+        "韧性 PNT 与 GNSS 抗欺骗抗干扰"
+      ],
+      "matched_terms": [
+        "pnt",
+        "gnss",
+        "gps",
+        "spoofing"
+      ],
+      "source_date": "2026-07-04"
     }
   ]
 }

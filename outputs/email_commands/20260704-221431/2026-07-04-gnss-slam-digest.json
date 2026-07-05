@@ -1,0 +1,47 @@
+[
+  {
+    "title": "A Conditional Timing Protection Level: Holdover-Limited Undetected Time Error Under GNSS Spoofing",
+    "authors": [
+      "Chakshu Baweja"
+    ],
+    "abstract": "A GNSS timing receiver under spoofing has no nominal-geometry fault for position-domain RAIM to bound: the threat is a slow, common-mode pull of served clock time that the receiver's own time-accuracy flag need not reveal. We make three graded contributions. First, a field measurement: solving the receiver clock trajectory from raw L1 pseudoranges and broadcast ephemeris, we show a recorded over-the-air spoof from the public JammerTest 2024 campaign pulled a u-blox ZED-F9P by about 1.01 ms of served time while it reported at most 51 ns, a gap near 20,000x. Second, an impossibility: against an adversary free to choose the ramp rate, no finite unconditional bound on undetected time error exists under a single self-referential clock-aided monitor, because a ramp slow enough to keep the disciplined reference in lock-step is never alarmed while the error grows without limit, so any finite guarantee is conditional. Third, the conditional bound: the Timing Protection Level (TPL), a model-free monitor's static detectability floor plus the oscillator's coast over the detection latency, holds given detection by an independent cross-satellite consistency check a coherent spoofer does not drive in lock-step. Each term is a closed form over a primitive verified in the open Kshana simulator, so the sum is reproducible by hand. Calibrated on the recorded attack, the budget is 114 ns at one-second recovery and 458 ns at a 60-second coast, thousands of times below the 1.01 ms accepted; a clock-aided sequential test alone gives essentially no protection on this slow ramp (it alarms only near the ~1 ms capture), while the model-free monitor alarms during the ramp. We are explicit: the bound is calibrated, not field-validated; carries no integrity-risk budget; and is reported as a band at long coast. The simulator, bound, and calibration example are open source under AGPL-3.0.",
+    "url": "http://arxiv.org/abs/2606.24210v1",
+    "pdf_url": "https://arxiv.org/pdf/2606.24210v1",
+    "published": "2026-06-23T06:52:58+00:00",
+    "updated": "2026-06-23T06:52:58+00:00",
+    "categories": [
+      "eess.SP",
+      "cs.CR"
+    ],
+    "primary_category": "eess.SP",
+    "arxiv_id": "2606.24210",
+    "comment": "8 pages, 5 figures, 2 tables. Calibrated on the public JammerTest 2024 dataset (Zenodo 10.5281/zenodo.15911589). TPL primitives, CUSUM detector, and calibration example open source in the Kshana simulator (AGPL-3.0)",
+    "journal_ref": null,
+    "doi": null,
+    "citation_count": null,
+    "influential_citation_count": null,
+    "venue": null,
+    "code_url": null,
+    "score": 83.75,
+    "topic_scores": {
+      "自定义研究主题": 24.0,
+      "GNSS 欺骗与干扰检测": 36.0
+    },
+    "matched_terms": [
+      "gnss timing",
+      "spoofing",
+      "protection level",
+      "gnss",
+      "integrity",
+      "attack",
+      "detection",
+      "receiver"
+    ],
+    "quality_score": 5.5,
+    "quality_signals": {
+      "code_signal": true,
+      "dataset_signal": true
+    },
+    "reason": "主题贴合 自定义研究主题、GNSS 欺骗与干扰检测，关键词集中在 gnss timing、spoofing、protection level、gnss、integrity、attack、detection、receiver。质量信号：有代码线索、有数据集/benchmark 线索，适合作为今日跟踪论文。"
+  }
+]
