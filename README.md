@@ -179,7 +179,16 @@ PYTHONPATH=src python scripts/upload_cover_to_wechat.py outputs/wechat-cover-gns
 
 其中 `paper` 版本只使用论文原图，并按 `DEEPDIVE_FIGURE_KEYWORDS` 里的关键词优先匹配流程图、框架图、系统图；`ai` 版本会用 `GEMINI_API_KEY` 生成 16:9 概念图，再保留论文分章节图组辅助解读。默认模式由 `.env` 里的 `DEEPDIVE_IMAGE_MODE=paper|ai|both` 控制。注意：`both` 是对比模式，会让每篇论文生成两份草稿，例如 `DEEPDIVE_LIMIT=3` 时会生成 6 篇草稿。
 
-正文文案默认优先用 Gemini 做轻量润色，API 不可用、额度不足或未配置 Key 时会自动回退到传统本地文案；邮件通知里会标明“解读模式：AI 润色（Gemini）”或“传统模板”。图片会过滤纯黑、纯白或低信息量抽图，再按介绍、方法、实验三类合成为章节图组，避免一张张图机械铺开。
+正文文案默认优先用 Gemini 做轻量润色，API 不可用、额度不足或未配置 Key 时会自动回退到传统本地文案；邮件通知里会标明“解读模式：AI 润色（Gemini）”或“传统模板”。图片会先用 `pdfimages` 抽取内嵌图片，再用 `pdftoppm + pdftotext -bbox` 按图注位置从渲染页面裁剪矢量流程图、架构图和结构图；随后过滤纯黑、纯白、低信息量抽图和无图注小图标，再按介绍、方法、实验三类合成为章节图组，避免一张张图机械铺开。
+
+两个抽图参数可以在 `.env` 里调：
+
+```bash
+DEEPDIVE_RENDER_FIGURE_PAGES=12
+DEEPDIVE_RENDER_FIGURE_DPI=200
+```
+
+页数越大，越容易抓到后文图，但本地渲染会更慢；DPI 越高，裁剪图越清晰，也会增加运行时间。
 
 确认草稿后也可以提交发布：
 

@@ -55,6 +55,19 @@ class TextPolishResult:
     texts: dict[str, str] | None = None
 
 
+@dataclass(frozen=True)
+class FigureCaptionAnchor:
+    page_index: int
+    page_width: float
+    page_height: float
+    x_min: float
+    y_min: float
+    x_max: float
+    y_max: float
+    caption: str
+    figure_number: str
+
+
 FIGURE_SECTION_ORDER = ("intro", "method", "experiment")
 FIGURE_SECTION_SOURCES = {
     "intro_group": "intro",
@@ -776,6 +789,33 @@ def _extract_figures(
     max_figures: int,
     figure_keywords: tuple[str, ...] = (),
 ) -> list[DeepDiveFigure]:
+    candidates = [
+        *_embedded_figure_candidates(pdf_path, output_dir, captions, figure_keywords),
+        *_rendered_figure_candidates(pdf_path, output_dir, figure_keywords),
+    ]
+    candidates.sort(key=lambda item: item[0], reverse=True)
+
+    selected: list[DeepDiveFigure] = []
+    seen: set[str] = set()
+    for _score, caption, image, source in candidates:
+        key = _figure_candidate_key(caption, image)
+        if key in seen:
+            continue
+        seen.add(key)
+        out = output_dir / f"figure-{len(selected) + 1}.jpg"
+        image.save(out, format="JPEG", quality=92, optimize=True, progressive=True)
+        selected.append(DeepDiveFigure(out, caption, source=source))
+        if len(selected) >= max_figures:
+            break
+    return selected
+
+
+def _embedded_figure_candidates(
+    pdf_path: Path,
+    output_dir: Path,
+    captions: list[str],
+    figure_keywords: tuple[str, ...] = (),
+) -> list[tuple[float, str, Image.Image, str]]:
     raw_dir = output_dir / "raw_images"
     raw_dir.mkdir(parents=True, exist_ok=True)
     prefix = raw_dir / "img"
@@ -784,7 +824,7 @@ def _extract_figures(
     except (OSError, subprocess.CalledProcessError):
         return []
 
-    candidates: list[tuple[float, str, Path, Image.Image]] = []
+    candidates: list[tuple[float, str, Image.Image, str]] = []
     for raw_index, path in enumerate(sorted(raw_dir.iterdir()), start=1):
         if path.suffix.lower() not in {".jpg", ".jpeg", ".ppm", ".png"}:
             continue
@@ -800,16 +840,64 @@ def _extract_figures(
         if _is_low_information_image(image):
             continue
         caption = _caption_for(captions, raw_index)
+        if not _has_real_figure_caption(caption) and _looks_like_icon_or_logo(image):
+            continue
         score = _paper_figure_score(image, caption, figure_keywords)
-        candidates.append((score, caption, path, image))
+        candidates.append((score, caption, image, "paper"))
+    return candidates
 
-    candidates.sort(key=lambda item: item[0], reverse=True)
-    selected: list[DeepDiveFigure] = []
-    for i, (_score, caption, _path, image) in enumerate(candidates[:max_figures], start=1):
-        out = output_dir / f"figure-{i}.jpg"
-        image.save(out, format="JPEG", quality=92, optimize=True, progressive=True)
-        selected.append(DeepDiveFigure(out, caption, source="paper"))
-    return selected
+
+def _rendered_figure_candidates(
+    pdf_path: Path,
+    output_dir: Path,
+    figure_keywords: tuple[str, ...] = (),
+) -> list[tuple[float, str, Image.Image, str]]:
+    anchors = _extract_caption_anchors(pdf_path)
+    if not anchors:
+        return []
+    page_limit = _rendered_figure_page_limit()
+    anchors = [anchor for anchor in anchors if anchor.page_index <= page_limit]
+    if not anchors:
+        return []
+
+    render_dir = output_dir / "rendered_figure_pages"
+    render_dir.mkdir(parents=True, exist_ok=True)
+    prefix = render_dir / "page"
+    env = os.environ.copy()
+    env.setdefault("XDG_CACHE_HOME", str((output_dir / ".cache").resolve()))
+    last_page = min(max(anchor.page_index for anchor in anchors), page_limit)
+    try:
+        subprocess.run(
+            ["pdftoppm", "-r", str(_rendered_figure_dpi()), "-f", "1", "-l", str(last_page), "-png", str(pdf_path), str(prefix)],
+            check=True,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return []
+
+    candidates: list[tuple[float, str, Image.Image, str]] = []
+    for anchor in anchors:
+        page_path = _rendered_page_path(render_dir, anchor.page_index)
+        if not page_path.exists():
+            continue
+        try:
+            with Image.open(page_path) as page_image:
+                image = _crop_rendered_figure(page_image.convert("RGB"), anchor)
+        except OSError:
+            continue
+        width, height = image.size
+        area = width * height
+        if width < 320 or height < 130 or area < 75_000:
+            continue
+        if _is_low_information_image(image):
+            continue
+        score = _paper_figure_score(image, anchor.caption, figure_keywords) + 42.0
+        if _caption_keyword_hits(anchor.caption, _rendered_figure_priority_keywords()):
+            score += 32.0
+        candidates.append((score, anchor.caption, image, "paper_render"))
+    return candidates
 
 
 def _render_fallback_figures(pdf_path: Path, output_dir: Path, max_figures: int) -> list[DeepDiveFigure]:
@@ -832,6 +920,244 @@ def _render_fallback_figures(pdf_path: Path, output_dir: Path, max_figures: int)
         image.save(out, format="JPEG", quality=90, optimize=True, progressive=True)
         figures.append(DeepDiveFigure(out, f"论文 PDF 第 {i} 页截图", source="pdf_page"))
     return figures
+
+
+def _extract_caption_anchors(pdf_path: Path) -> list[FigureCaptionAnchor]:
+    try:
+        result = subprocess.run(
+            ["pdftotext", "-bbox-layout", str(pdf_path), "-"],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return []
+    return _parse_caption_anchors(result.stdout)
+
+
+def _parse_caption_anchors(text: str) -> list[FigureCaptionAnchor]:
+    page_re = re.compile(r"<page\s+([^>]*)>(.*?)</page>", re.DOTALL)
+    line_re = re.compile(r"<line\s+([^>]*)>(.*?)</line>", re.DOTALL)
+    anchors: list[FigureCaptionAnchor] = []
+    for page_index, page_match in enumerate(page_re.finditer(text), start=1):
+        page_attrs = _bbox_attrs(page_match.group(1))
+        page_width = page_attrs.get("width", 0.0)
+        page_height = page_attrs.get("height", 0.0)
+        if page_width <= 0 or page_height <= 0:
+            continue
+        lines: list[tuple[dict[str, float], str]] = []
+        for line_match in line_re.finditer(page_match.group(2)):
+            attrs = _bbox_attrs(line_match.group(1))
+            line_text = _bbox_line_text(line_match.group(2))
+            if attrs and line_text:
+                lines.append((attrs, line_text))
+        anchors.extend(_caption_anchors_from_lines(page_index, page_width, page_height, lines))
+    return anchors
+
+
+def _bbox_attrs(text: str) -> dict[str, float]:
+    attrs: dict[str, float] = {}
+    for key, value in re.findall(r'(\w+)="([^"]*)"', text):
+        if key in {"xMin", "xMax", "yMin", "yMax", "width", "height"}:
+            try:
+                attrs[key] = float(value)
+            except ValueError:
+                continue
+    return attrs
+
+
+def _bbox_line_text(line_block: str) -> str:
+    words = re.findall(r"<word\s+[^>]*>(.*?)</word>", line_block, flags=re.DOTALL)
+    return " ".join(html.unescape(word.strip()) for word in words if word.strip())
+
+
+def _caption_anchors_from_lines(
+    page_index: int,
+    page_width: float,
+    page_height: float,
+    lines: list[tuple[dict[str, float], str]],
+) -> list[FigureCaptionAnchor]:
+    anchors: list[FigureCaptionAnchor] = []
+    for index, (attrs, text) in enumerate(lines):
+        figure_number = _figure_caption_number(text)
+        if not figure_number:
+            continue
+        bbox = dict(attrs)
+        caption_parts = [text]
+        cursor = index + 1
+        while cursor < len(lines):
+            next_attrs, next_text = lines[cursor]
+            same_line = abs(next_attrs.get("yMin", 0.0) - bbox.get("yMin", 0.0)) < 3.0
+            if same_line:
+                caption_parts.append(next_text)
+                bbox["xMax"] = max(bbox.get("xMax", 0.0), next_attrs.get("xMax", 0.0))
+                bbox["yMax"] = max(bbox.get("yMax", 0.0), next_attrs.get("yMax", 0.0))
+                cursor += 1
+                continue
+            if _is_caption_continuation(next_attrs, next_text, bbox, page_width):
+                caption_parts.append(next_text)
+                bbox["xMin"] = min(bbox.get("xMin", 0.0), next_attrs.get("xMin", 0.0))
+                bbox["xMax"] = max(bbox.get("xMax", 0.0), next_attrs.get("xMax", 0.0))
+                bbox["yMax"] = max(bbox.get("yMax", 0.0), next_attrs.get("yMax", 0.0))
+                cursor += 1
+                continue
+            break
+        caption = _clean_figure_caption(" ".join(caption_parts))
+        anchors.append(
+            FigureCaptionAnchor(
+                page_index=page_index,
+                page_width=page_width,
+                page_height=page_height,
+                x_min=bbox.get("xMin", 0.0),
+                y_min=attrs.get("yMin", 0.0),
+                x_max=bbox.get("xMax", 0.0),
+                y_max=bbox.get("yMax", attrs.get("yMax", 0.0)),
+                caption=caption[:260],
+                figure_number=figure_number,
+            )
+        )
+    return anchors
+
+
+def _figure_caption_number(text: str) -> str:
+    match = re.match(r"^Fig(?:ure)?\.?\s*(\d+)[.:]?\s*(.*)$", text.strip(), re.IGNORECASE)
+    if not match:
+        return ""
+    body = match.group(2).strip()
+    if _caption_body_looks_like_reference(body):
+        return ""
+    return match.group(1)
+
+
+def _caption_body_looks_like_reference(body: str) -> bool:
+    if not body:
+        return False
+    first = re.split(r"\s+", body, maxsplit=1)[0].strip(".,:;()[]").lower()
+    return first in {
+        "shows",
+        "presents",
+        "depicts",
+        "illustrates",
+        "reports",
+        "compares",
+        "contains",
+        "demonstrates",
+        "summarizes",
+        "provides",
+        "gives",
+        "analyzes",
+    }
+
+
+def _is_caption_continuation(next_attrs: dict[str, float], next_text: str, bbox: dict[str, float], page_width: float) -> bool:
+    if _figure_caption_number(next_text):
+        return False
+    gap = next_attrs.get("yMin", 0.0) - bbox.get("yMax", 0.0)
+    if gap < -1.0 or gap > 10.0:
+        return False
+    if re.match(r"^(?:[IVX]+\.|\d+(?:\.\d+)*\.?)\s+[A-Z]", next_text):
+        return False
+    left_aligned = abs(next_attrs.get("xMin", 0.0) - bbox.get("xMin", 0.0)) < 32.0
+    full_width_caption = bbox.get("xMin", page_width) < page_width * 0.2 and bbox.get("xMax", 0.0) > page_width * 0.72
+    return left_aligned or full_width_caption
+
+
+def _rendered_page_path(render_dir: Path, page_index: int) -> Path:
+    return render_dir / f"page-{page_index}.png"
+
+
+def _rendered_figure_page_limit() -> int:
+    try:
+        return max(1, int(os.getenv("DEEPDIVE_RENDER_FIGURE_PAGES", "12")))
+    except ValueError:
+        return 12
+
+
+def _rendered_figure_dpi() -> int:
+    try:
+        return max(120, int(os.getenv("DEEPDIVE_RENDER_FIGURE_DPI", "200")))
+    except ValueError:
+        return 200
+
+
+def _crop_rendered_figure(page_image: Image.Image, anchor: FigureCaptionAnchor) -> Image.Image:
+    scale_x = page_image.width / max(anchor.page_width, 1.0)
+    scale_y = page_image.height / max(anchor.page_height, 1.0)
+    x0, y0, x1, y1 = _rendered_figure_crop_box(anchor)
+    crop = page_image.crop((int(x0 * scale_x), int(y0 * scale_y), int(x1 * scale_x), int(y1 * scale_y)))
+    crop = _select_visual_block_above_caption(crop)
+    return _trim_white(crop)
+
+
+def _rendered_figure_crop_box(anchor: FigureCaptionAnchor) -> tuple[float, float, float, float]:
+    page_width = anchor.page_width
+    center_x = (anchor.x_min + anchor.x_max) / 2
+    full_width = anchor.x_min < page_width * 0.18 and anchor.x_max > page_width * 0.72
+    margin = 42.0
+    gutter = 6.0
+    if full_width:
+        x0, x1 = margin, page_width - margin
+        crop_height = 260.0
+    elif center_x < page_width / 2:
+        x0, x1 = margin, page_width / 2 - gutter
+        crop_height = 280.0
+    else:
+        x0, x1 = page_width / 2 + gutter, page_width - margin
+        crop_height = 280.0
+    y1 = max(36.0, anchor.y_min - 4.0)
+    y0 = max(36.0, y1 - crop_height)
+    return x0, y0, x1, y1
+
+
+def _select_visual_block_above_caption(image: Image.Image) -> Image.Image:
+    if image.height < 80:
+        return image
+    gray = image.convert("L").resize((image.width, max(1, image.height // 2)))
+    active: list[bool] = []
+    for y in range(gray.height):
+        dark_ratio = sum(1 for x in range(gray.width) if gray.getpixel((x, y)) < 245) / max(gray.width, 1)
+        active.append(dark_ratio > 0.025)
+
+    groups: list[tuple[int, int]] = []
+    start: int | None = None
+    for index, is_active in enumerate([*active, False]):
+        if is_active and start is None:
+            start = index
+        elif not is_active and start is not None:
+            if index - start >= 2:
+                groups.append((start, index))
+            start = None
+    if not groups:
+        return image
+
+    merged: list[tuple[int, int]] = []
+    for group in groups:
+        if merged and group[0] - merged[-1][1] < 8:
+            merged[-1] = (merged[-1][0], group[1])
+        else:
+            merged.append(group)
+
+    candidates = [group for group in merged if group[1] > gray.height * 0.22]
+    selected = max(candidates or merged, key=lambda group: (group[1], group[1] - group[0]))
+    selected_index = merged.index(selected)
+    while selected_index > 0 and selected[1] - selected[0] < 55:
+        previous = merged[selected_index - 1]
+        selected = (previous[0], selected[1])
+        selected_index -= 1
+
+    y0 = max(0, selected[0] * 2 - 20)
+    y1 = min(image.height, selected[1] * 2 + 20)
+    return image.crop((0, y0, image.width, y1))
+
+
+def _figure_candidate_key(caption: str, image: Image.Image) -> str:
+    match = re.match(r"^\s*Fig(?:ure)?\.?\s*(\d+)\b", caption, re.IGNORECASE)
+    if match:
+        return f"fig:{match.group(1)}"
+    normalized = re.sub(r"\W+", "", caption.lower())[:80]
+    if normalized:
+        return f"caption:{normalized}"
+    return f"image:{image.width}x{image.height}"
 
 
 def _trim_white(image: Image.Image) -> Image.Image:
@@ -880,6 +1206,21 @@ def _figure_file_is_usable(path: Path) -> bool:
         return False
 
 
+def _looks_like_icon_or_logo(image: Image.Image) -> bool:
+    width, height = image.size
+    ratio = width / max(height, 1)
+    area = width * height
+    if area > 420_000 or not 0.82 <= ratio <= 1.22:
+        return False
+    sample = image.convert("L").resize((64, 64))
+    pixels = list(sample.getdata())
+    if not pixels:
+        return True
+    very_dark = sum(1 for value in pixels if value < 25) / len(pixels)
+    very_light = sum(1 for value in pixels if value > 230) / len(pixels)
+    return very_dark > 0.25 or very_light > 0.65
+
+
 def _paper_figure_score(image: Image.Image, caption: str, figure_keywords: tuple[str, ...]) -> float:
     width, height = image.size
     ratio = width / max(height, 1)
@@ -909,13 +1250,23 @@ def _default_figure_keywords() -> tuple[str, ...]:
     return (
         "framework",
         "architecture",
+        "architecture overview",
         "pipeline",
         "overview",
         "system",
+        "system overview",
         "workflow",
         "flow",
         "schematic",
         "block diagram",
+        "structure",
+        "diagram",
+        "registration",
+        "hash map",
+        "voxel",
+        "kalman",
+        "filter",
+        "sensor fusion",
         "setup",
         "experimental setup",
         "method",
@@ -929,6 +1280,26 @@ def _default_figure_keywords() -> tuple[str, ...]:
         "结构",
         "方法",
         "实验设置",
+    )
+
+
+def _rendered_figure_priority_keywords() -> tuple[str, ...]:
+    return (
+        "architecture",
+        "architecture overview",
+        "framework",
+        "pipeline",
+        "system overview",
+        "structure",
+        "block diagram",
+        "schematic",
+        "workflow",
+        "flow",
+        "hash map",
+        "voxel",
+        "sensor fusion",
+        "kalman",
+        "registration",
     )
 
 
@@ -1198,12 +1569,51 @@ def _make_figure_group(figures: list[DeepDiveFigure], output_dir: Path, section:
     if len(images) < 2:
         return _as_group_figure(images[0][0], section) if images else None
 
-    columns = 2
+    columns = 1 if section in {"intro", "method"} else 2
     rows = (len(images) + columns - 1) // columns
-    cell_width = 640
-    cell_height = 390
+    cell_width = 1080 if columns == 1 else 640
+    cell_height = 520 if columns == 1 else 390
     pad = 18
     label_height = 28
+    if columns == 1:
+        fitted_images = [_fit_image(image, cell_width, 620) for _figure, image in images]
+        canvas_height = pad + sum(image.height + label_height + pad for image in fitted_images)
+        canvas = Image.new("RGB", (cell_width + 2 * pad, canvas_height), "white")
+        y = pad
+        for index, fitted in enumerate(fitted_images):
+            x = pad + (cell_width - fitted.width) // 2
+            canvas.paste(fitted, (x, y))
+            _draw_basic_label(canvas, f"({chr(ord('a') + index)})", pad, y + fitted.height + 6)
+            y += fitted.height + label_height + pad
+
+        out = output_dir / f"{section}-group.jpg"
+        canvas.save(out, format="JPEG", quality=92, optimize=True, progressive=True)
+        used_figures = [figure for figure, _image in images]
+        caption = _group_caption(section, used_figures)
+        return DeepDiveFigure(out, caption, source=f"{section}_group", children=tuple(figure.caption for figure in used_figures))
+
+    if columns == 2 and len(images) == 3:
+        top_images = [_fit_image(image, cell_width, cell_height) for _figure, image in images[:2]]
+        bottom_image = _fit_image(images[2][1], columns * cell_width + pad, 430)
+        top_height = max(image.height for image in top_images)
+        canvas_width = columns * cell_width + (columns + 1) * pad
+        canvas_height = pad + top_height + label_height + pad + bottom_image.height + label_height + pad
+        canvas = Image.new("RGB", (canvas_width, canvas_height), "white")
+        for index, fitted in enumerate(top_images):
+            x = pad + index * (cell_width + pad) + (cell_width - fitted.width) // 2
+            y = pad + (top_height - fitted.height) // 2
+            canvas.paste(fitted, (x, y))
+            _draw_basic_label(canvas, f"({chr(ord('a') + index)})", pad + index * (cell_width + pad), pad + top_height + 6)
+        bottom_y = pad + top_height + label_height + pad
+        canvas.paste(bottom_image, ((canvas_width - bottom_image.width) // 2, bottom_y))
+        _draw_basic_label(canvas, "(c)", pad, bottom_y + bottom_image.height + 6)
+
+        out = output_dir / f"{section}-group.jpg"
+        canvas.save(out, format="JPEG", quality=92, optimize=True, progressive=True)
+        used_figures = [figure for figure, _image in images]
+        caption = _group_caption(section, used_figures)
+        return DeepDiveFigure(out, caption, source=f"{section}_group", children=tuple(figure.caption for figure in used_figures))
+
     canvas = Image.new("RGB", (columns * cell_width + (columns + 1) * pad, rows * (cell_height + label_height) + (rows + 1) * pad), "white")
     for index, (_figure, image) in enumerate(images):
         row = index // columns
@@ -1272,6 +1682,35 @@ def _figure_section(figure: DeepDiveFigure) -> str:
     if any(
         term in caption
         for term in (
+            "architecture",
+            "framework",
+            "pipeline",
+            "workflow",
+            "flow",
+            "block diagram",
+            "method",
+            "network",
+            "algorithm",
+            "model",
+            "proposed",
+            "registration",
+            "hash map",
+            "voxel",
+            "kalman",
+            "filter",
+            "sensor fusion",
+            "架构",
+            "框架",
+            "流程",
+            "结构",
+            "方法",
+            "算法",
+        )
+    ):
+        return "method"
+    if any(
+        term in caption
+        for term in (
             "introduction",
             "background",
             "motivation",
@@ -1293,31 +1732,6 @@ def _figure_section(figure: DeepDiveFigure) -> str:
         )
     ):
         return "intro"
-    if any(
-        term in caption
-        for term in (
-            "framework",
-            "architecture",
-            "pipeline",
-            "workflow",
-            "flow",
-            "system overview",
-            "block diagram",
-            "method",
-            "network",
-            "algorithm",
-            "model",
-            "proposed",
-            "框架",
-            "架构",
-            "流程",
-            "系统",
-            "结构",
-            "方法",
-            "算法",
-        )
-    ):
-        return "method"
     return "method"
 
 
@@ -1343,6 +1757,15 @@ def _is_experiment_figure(figure: DeepDiveFigure) -> bool:
             "benchmark",
             "performance",
             "dataset",
+            "point cloud",
+            "maps",
+            "rmse",
+            "ape",
+            "comparison",
+            "qualitative",
+            "quantitative",
+            "kitti",
+            "hilti",
             "runtime",
             "memory",
             "computation",

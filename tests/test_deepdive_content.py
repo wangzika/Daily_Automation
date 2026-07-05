@@ -8,16 +8,20 @@ from PIL import Image, ImageDraw
 
 from daily_gnss_slam_digest.deepdive import (
     DeepDiveFigure,
+    FigureCaptionAnchor,
     PaperReading,
     TextPolishResult,
+    _crop_rendered_figure,
     _content_mode_label,
     _display_figure_caption,
     _draft_source_lines,
     _extract_base64_image,
     _figure_reading,
+    _figure_section,
     _file_url,
     _image_variants,
     _is_low_information_image,
+    _parse_caption_anchors,
     _prepare_article_figures,
     build_deepdive_html,
     build_deepdive_markdown,
@@ -194,6 +198,79 @@ class DeepDiveContentTest(unittest.TestCase):
 
             self.assertEqual(len(prepared), 1)
             self.assertEqual(prepared[0].path, method)
+
+    def test_bbox_caption_parser_finds_captions_not_text_references(self) -> None:
+        bbox_text = """
+        <html><body><doc>
+          <page width="612.000000" height="792.000000">
+            <flow><block><line xMin="323.000000" yMin="100.000000" xMax="558.000000" yMax="110.000000">
+              <word xMin="323.000000" yMin="100.000000" xMax="338.000000" yMax="110.000000">Fig.</word>
+              <word xMin="341.000000" yMin="100.000000" xMax="348.000000" yMax="110.000000">2</word>
+              <word xMin="352.000000" yMin="100.000000" xMax="378.000000" yMax="110.000000">shows</word>
+              <word xMin="382.000000" yMin="100.000000" xMax="410.000000" yMax="110.000000">the</word>
+            </line></block></flow>
+            <flow><block><line xMin="54.000000" yMin="210.000000" xMax="558.000000" yMax="220.000000">
+              <word xMin="54.000000" yMin="210.000000" xMax="70.000000" yMax="220.000000">Fig.</word>
+              <word xMin="74.000000" yMin="210.000000" xMax="80.000000" yMax="220.000000">2.</word>
+              <word xMin="86.000000" yMin="210.000000" xMax="160.000000" yMax="220.000000">Architecture</word>
+              <word xMin="164.000000" yMin="210.000000" xMax="220.000000" yMax="220.000000">Overview</word>
+            </line></block></flow>
+            <flow><block><line xMin="54.000000" yMin="222.000000" xMax="250.000000" yMax="232.000000">
+              <word xMin="54.000000" yMin="222.000000" xMax="80.000000" yMax="232.000000">of</word>
+              <word xMin="84.000000" yMin="222.000000" xMax="130.000000" yMax="232.000000">FAR-LIO.</word>
+            </line></block></flow>
+          </page>
+        </doc></body></html>
+        """
+
+        anchors = _parse_caption_anchors(bbox_text)
+
+        self.assertEqual(len(anchors), 1)
+        self.assertEqual(anchors[0].figure_number, "2")
+        self.assertIn("Architecture Overview", anchors[0].caption)
+        self.assertIn("FAR-LIO", anchors[0].caption)
+
+    def test_rendered_figure_crop_prefers_visual_block_above_caption(self) -> None:
+        page = Image.new("RGB", (850, 1100), "white")
+        draw = ImageDraw.Draw(page)
+        for row in range(8):
+            y = 120 + row * 28
+            draw.text((70, y), "This paragraph mentions Fig. 3 before the actual diagram.", fill=(0, 0, 0))
+        # Diagram block below the paragraph.
+        for index in range(5):
+            x0 = 110 + index * 110
+            y0 = 520 + (index % 2) * 70
+            draw.rectangle((x0, y0, x0 + 80, y0 + 50), outline=(30, 90, 120), width=4)
+            draw.line((x0 + 80, y0 + 25, min(x0 + 135, 760), y0 + 25), fill=(0, 140, 110), width=4)
+        draw.text((160, 780), "Fig. 3. Structure of the CUDA-accelerated voxel map.", fill=(0, 0, 0))
+        anchor = FigureCaptionAnchor(
+            page_index=1,
+            page_width=612,
+            page_height=792,
+            x_min=82,
+            y_min=562,
+            x_max=270,
+            y_max=574,
+            caption="Fig. 3. Structure of the CUDA-accelerated voxel map.",
+            figure_number="3",
+        )
+
+        crop = _crop_rendered_figure(page, anchor)
+
+        self.assertGreater(crop.width, 300)
+        self.assertGreater(crop.height, 120)
+        self.assertLess(crop.height, 420)
+        self.assertEqual(_figure_section(DeepDiveFigure(Path("figure.jpg"), anchor.caption, source="paper_render")), "method")
+        self.assertEqual(
+            _figure_section(
+                DeepDiveFigure(
+                    Path("result.jpg"),
+                    "Fig. 1. Point cloud maps of the Yas Marina Circuit and KITTI sequence.",
+                    source="paper_render",
+                )
+            ),
+            "experiment",
+        )
 
     def test_polished_text_overrides_traditional_text(self) -> None:
         paper = {"title": "Example", "authors": [], "abstract": "GNSS spoofing risk.", "matched_terms": ["gnss"]}

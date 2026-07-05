@@ -21,7 +21,7 @@
    自动下载论文 PDF，提取论文中的关键图，生成更详细的论文解读文章，并创建微信公众号草稿。
 
 5. 论文图作为封面和章节图组  
-   单篇论文解读会优先从 PDF 中选择 framework、architecture、pipeline、system 等流程图或框架图作为公众号草稿封面；正文图片会按 Introduction、Method、Experiments 分章节组图，并过滤纯黑、纯白或低信息量抽图。
+   单篇论文解读会优先从 PDF 中选择 framework、architecture、pipeline、system 等流程图或框架图作为公众号草稿封面；正文图片会先抽取内嵌图片，再按图注坐标裁剪 PDF 渲染页面里的矢量流程图、架构图和结构图，最后按 Introduction、Method、Experiments 分章节组图，并过滤纯黑、纯白、低信息量抽图和无图注小图标。
 
 6. 周报热点汇总  
    每周自动生成热点方向汇总，包含方向趋势、高频关键词、有代码/复现线索和本周值得追的论文。
@@ -307,6 +307,13 @@ launchctl kickstart -k gui/$(id -u)/com.codex.daily-gnss-slam-digest
 | `both` | `./scripts/generate_deepdives.sh draft both` | 同一篇论文生成原图版和 AI 版两份草稿，便于在公众号后台对比 |
 
 注意：`both` 是对比模式，会让每篇论文生成两份草稿。例如 `DEEPDIVE_LIMIT=3` 时，最终会进入草稿箱 6 篇。
+
+渲染裁剪参数：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `DEEPDIVE_RENDER_FIGURE_PAGES` | `12` | 最多渲染并扫描 PDF 前多少页的图注 |
+| `DEEPDIVE_RENDER_FIGURE_DPI` | `200` | 页面渲染分辨率；更高更清晰但更慢 |
 
 正文文案默认 `DEEPDIVE_TEXT_POLISH_MODE=api`，会优先调用 Gemini 做润色；如果 API 不可用、额度不足或没有配置 Key，会自动回退到传统本地文案。草稿邮件会标明“解读模式”和“配图模式”，例如“AI 润色（Gemini）”或“传统模板”。实验/结果类图片默认 `DEEPDIVE_EXPERIMENT_COMPOSITE=1`，会合成为一张组合图再做整体解释。
 
