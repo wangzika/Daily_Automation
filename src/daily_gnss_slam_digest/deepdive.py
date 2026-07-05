@@ -55,6 +55,16 @@ class TextPolishResult:
     texts: dict[str, str] | None = None
 
 
+FIGURE_SECTION_ORDER = ("intro", "method", "experiment")
+FIGURE_SECTION_SOURCES = {
+    "intro_group": "intro",
+    "method_group": "method",
+    "experiment_group": "experiment",
+    "paper_composite": "experiment",
+}
+PAPER_CHAPTER_ROLES = ("intro", "method", "experiment", "discussion")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     papers = json.loads(args.input_json.read_text(encoding="utf-8"))[: args.limit]
@@ -364,6 +374,8 @@ def build_deepdive_markdown(
 ) -> str:
     title = _article_title(paper)
     chapters = _chapter_walkthrough(paper, reading)
+    figure_by_section, supplemental_figures = _section_figures(figures)
+    image_by_path = _image_map_by_path(figures, image_map)
     lines = [
         f"# {title}",
         "",
@@ -388,37 +400,39 @@ def build_deepdive_markdown(
         "",
         _polished_text(text_polish, "story_intro", _story_intro(paper, reading)),
         "",
-        "## 章节精读",
-        "",
-        *_chapter_markdown(chapters[:2]),
-        "### 3. 主图和关键图解：先沿着数据流走一遍",
+        "## 按论文章节精读",
         "",
     ]
-    for i, figure in enumerate(figures, start=1):
-        key = f"figure_{i}"
-        figure_caption = _display_figure_caption(figure.caption, i, figure.source)
-        lines.extend(
-            [
-                f"![{figure_caption}]({image_map.get(key, figure.path.name)})",
-                "",
-                figure_caption,
-                "",
-                _polished_text(text_polish, f"figure:{figure.path.name}", _figure_reading(paper, reading, figure, i)),
-                "",
-            ]
-        )
+    for index, (role, chapter) in enumerate(zip(PAPER_CHAPTER_ROLES, chapters), start=1):
+        lines.extend(_chapter_markdown_one(chapter, role, index))
+        figure = figure_by_section.get(role)
+        if figure:
+            lines.extend(
+                _figure_markdown_block(
+                    paper,
+                    reading,
+                    figure,
+                    image_by_path.get(figure.path, figure.path.name),
+                    _figure_display_index(figures, figure),
+                    text_polish,
+                )
+            )
 
-    lines.extend(
-        [
-            *_chapter_markdown(chapters[2:], start=4),
-            "",
-            "## 读完之后可以追问",
-            "",
-            *_markdown_bullets(_followup_questions(paper)),
-            "",
-            f"> {_image_note(figures)}",
-        ]
-    )
+    if supplemental_figures:
+        lines.extend(["## 补充图", ""])
+        for figure in supplemental_figures:
+            lines.extend(
+                _figure_markdown_block(
+                    paper,
+                    reading,
+                    figure,
+                    image_by_path.get(figure.path, figure.path.name),
+                    _figure_display_index(figures, figure),
+                    text_polish,
+                )
+            )
+
+    lines.extend(["## 读完之后可以追问", "", *_markdown_bullets(_followup_questions(paper)), "", f"> {_image_note(figures)}"])
     return "\n".join(lines).strip() + "\n"
 
 
@@ -433,6 +447,8 @@ def build_deepdive_html(
 ) -> str:
     title = _article_title(paper)
     chapters = _chapter_walkthrough(paper, reading)
+    figure_by_section, supplemental_figures = _section_figures(figures)
+    image_by_path = _image_map_by_path(figures, image_map)
     parts = [
         '<section style="max-width:677px;margin:0 auto;color:#24343a;font-family:-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif;">',
     ]
@@ -454,29 +470,41 @@ def build_deepdive_html(
         _numbered_cards(_source_clues(paper, reading)),
         _section_title("故事版导读"),
         _paragraph(_polished_text(text_polish, "story_intro", _story_intro(paper, reading))),
-        _section_title("章节精读"),
-        _chapter_cards(chapters[:2]),
-        _inline_chapter_title(3, "主图和关键图解：先沿着数据流走一遍"),
+        _section_title("按论文章节精读"),
         ]
     )
 
-    for i, figure in enumerate(figures, start=1):
-        key = f"figure_{i}"
-        src = image_map.get(key, figure.path.name)
-        figure_caption = _display_figure_caption(figure.caption, i, figure.source)
-        parts.extend(
-            [
-                '<section style="margin:0 0 22px;padding:14px;border:1px solid #e1eeee;border-radius:10px;background:#ffffff;">',
-                f'<img src="{html.escape(src)}" alt="{html.escape(figure_caption)}" style="display:block;width:100%;height:auto;border-radius:6px;"/>',
-                f'<p style="margin:10px 0 8px;color:#0b9984;font-size:13px;font-weight:700;line-height:1.6;">{html.escape(figure_caption)}</p>',
-                f'<p style="margin:0;color:#43565d;font-size:14px;line-height:1.85;">{html.escape(_polished_text(text_polish, f"figure:{figure.path.name}", _figure_reading(paper, reading, figure, i)))}</p>',
-                "</section>",
-            ]
-        )
+    for index, (role, chapter) in enumerate(zip(PAPER_CHAPTER_ROLES, chapters), start=1):
+        parts.append(_chapter_card_one(chapter, role, index))
+        figure = figure_by_section.get(role)
+        if figure:
+            parts.append(
+                _figure_html_block(
+                    paper,
+                    reading,
+                    figure,
+                    image_by_path.get(figure.path, figure.path.name),
+                    _figure_display_index(figures, figure),
+                    text_polish,
+                )
+            )
+
+    if supplemental_figures:
+        parts.append(_section_title("补充图"))
+        for figure in supplemental_figures:
+            parts.append(
+                _figure_html_block(
+                    paper,
+                    reading,
+                    figure,
+                    image_by_path.get(figure.path, figure.path.name),
+                    _figure_display_index(figures, figure),
+                    text_polish,
+                )
+            )
 
     parts.extend(
         [
-            _chapter_cards(chapters[2:], start=4),
             _section_title("读完之后可以追问"),
             _numbered_cards(_followup_questions(paper)),
             f'<p style="margin:22px 0 0;color:#8a9da3;font-size:12px;line-height:1.8;">{html.escape(_image_note(figures))}</p>',
@@ -486,9 +514,107 @@ def build_deepdive_html(
     return "".join(parts)
 
 
+def _image_map_by_path(figures: list[DeepDiveFigure], image_map: dict[str, str]) -> dict[Path, str]:
+    return {figure.path: image_map.get(f"figure_{index}", figure.path.name) for index, figure in enumerate(figures, start=1)}
+
+
+def _figure_display_index(figures: list[DeepDiveFigure], figure: DeepDiveFigure) -> int:
+    for index, item in enumerate(figures, start=1):
+        if item.path == figure.path:
+            return index
+    return 1
+
+
+def _section_figures(figures: list[DeepDiveFigure]) -> tuple[dict[str, DeepDiveFigure], list[DeepDiveFigure]]:
+    by_section: dict[str, DeepDiveFigure] = {}
+    supplemental: list[DeepDiveFigure] = []
+    for figure in figures:
+        section = _figure_section(figure)
+        if section in FIGURE_SECTION_ORDER and section not in by_section:
+            by_section[section] = figure
+        else:
+            supplemental.append(figure)
+    return by_section, supplemental
+
+
+def _figure_markdown_block(
+    paper: dict[str, Any],
+    reading: PaperReading,
+    figure: DeepDiveFigure,
+    src: str,
+    display_index: int,
+    text_polish: TextPolishResult | None,
+) -> list[str]:
+    figure_caption = _display_figure_caption(figure.caption, display_index, figure.source)
+    return [
+        f"![{figure_caption}]({src})",
+        "",
+        figure_caption,
+        "",
+        _polished_text(text_polish, f"figure:{figure.path.name}", _figure_reading(paper, reading, figure, display_index)),
+        "",
+    ]
+
+
+def _figure_html_block(
+    paper: dict[str, Any],
+    reading: PaperReading,
+    figure: DeepDiveFigure,
+    src: str,
+    display_index: int,
+    text_polish: TextPolishResult | None,
+) -> str:
+    figure_caption = _display_figure_caption(figure.caption, display_index, figure.source)
+    return (
+        '<section style="margin:0 0 22px;padding:14px;border:1px solid #e1eeee;border-radius:10px;background:#ffffff;">'
+        f'<img src="{html.escape(src)}" alt="{html.escape(figure_caption)}" style="display:block;width:100%;height:auto;border-radius:6px;"/>'
+        f'<p style="margin:10px 0 8px;color:#0b9984;font-size:13px;font-weight:700;line-height:1.6;">{html.escape(figure_caption)}</p>'
+        f'<p style="margin:0;color:#43565d;font-size:14px;line-height:1.85;">'
+        f'{html.escape(_polished_text(text_polish, f"figure:{figure.path.name}", _figure_reading(paper, reading, figure, display_index)))}</p>'
+        "</section>"
+    )
+
+
+def _chapter_markdown_one(chapter: tuple[str, str, tuple[str, ...]], role: str, index: int) -> list[str]:
+    title, body, points = chapter
+    lines = [f"### {index}. {_paper_chapter_title(role, title)}", "", body, ""]
+    if points:
+        lines.extend([*_markdown_bullets(list(points)), ""])
+    return lines
+
+
+def _chapter_card_one(chapter: tuple[str, str, tuple[str, ...]], role: str, index: int) -> str:
+    title, body, points = chapter
+    point_html = ""
+    if points:
+        point_html = "".join(
+            f'<p style="margin:8px 0 0;color:#40545c;font-size:14px;line-height:1.8;">'
+            f'<strong style="color:#0b9984;">{point_index}.</strong> {html.escape(point)}</p>'
+            for point_index, point in enumerate(points, start=1)
+        )
+    return (
+        '<section style="margin:0 0 12px;padding:14px 15px;background:#f7fbfb;'
+        'border:1px solid #e0eeee;border-radius:8px;">'
+        f'<p style="margin:0 0 8px;color:#0b9984;font-size:14px;font-weight:800;">{index}. {html.escape(_paper_chapter_title(role, title))}</p>'
+        f'<p style="margin:0;color:#40545c;font-size:14px;line-height:1.9;">{html.escape(body)}</p>'
+        f"{point_html}"
+        "</section>"
+    )
+
+
+def _paper_chapter_title(role: str, fallback: str) -> str:
+    titles = {
+        "intro": "Introduction：研究背景与问题",
+        "method": "Method：方法与系统设计",
+        "experiment": "Experiments：实验设置与结果",
+        "discussion": "Discussion：结论、边界与复现",
+    }
+    return titles.get(role, fallback)
+
+
 def _image_note(figures: list[DeepDiveFigure]) -> str:
     if any(figure.source == "ai" for figure in figures):
-        return "主图为辅助示意图，论文原图来自 PDF；图片仅用于论文解读和学术讨论，正式转载前建议核对论文许可和作者要求。"
+        return "概念图为辅助示意图，论文原图来自 PDF；图片仅用于论文解读和学术讨论，正式转载前建议核对论文许可和作者要求。"
     return "图像来自论文 PDF，仅用于论文解读和学术讨论，正式转载前建议核对论文许可和作者要求。"
 
 
@@ -671,7 +797,7 @@ def _extract_figures(
         area = width * height
         if width < 420 or height < 170 or area < 110_000:
             continue
-        if _ink_ratio(image) < 0.015:
+        if _is_low_information_image(image):
             continue
         caption = _caption_for(captions, raw_index)
         score = _paper_figure_score(image, caption, figure_keywords)
@@ -700,6 +826,8 @@ def _render_fallback_figures(pdf_path: Path, output_dir: Path, max_figures: int)
     for i, path in enumerate(sorted(render_dir.glob("*.png"))[:max_figures], start=1):
         image = Image.open(path).convert("RGB")
         image.thumbnail((1200, 900))
+        if _is_low_information_image(image):
+            continue
         out = output_dir / f"figure-{i}.jpg"
         image.save(out, format="JPEG", quality=90, optimize=True, progressive=True)
         figures.append(DeepDiveFigure(out, f"论文 PDF 第 {i} 页截图", source="pdf_page"))
@@ -726,6 +854,30 @@ def _ink_ratio(image: Image.Image) -> float:
     pixels = sample.getdata()
     ink = sum(1 for r, g, b in pixels if min(r, g, b) < 245)
     return ink / max(len(pixels), 1)
+
+
+def _is_low_information_image(image: Image.Image) -> bool:
+    sample = image.convert("L").resize((min(96, max(1, image.width)), min(96, max(1, image.height))))
+    pixels = list(sample.getdata())
+    if not pixels:
+        return True
+    minimum = min(pixels)
+    maximum = max(pixels)
+    dark_ratio = sum(1 for value in pixels if value < 12) / len(pixels)
+    light_ratio = sum(1 for value in pixels if value > 248) / len(pixels)
+    if dark_ratio > 0.92 or light_ratio > 0.985:
+        return True
+    if maximum - minimum < 10:
+        return True
+    return _ink_ratio(image) < 0.015
+
+
+def _figure_file_is_usable(path: Path) -> bool:
+    try:
+        with Image.open(path) as image:
+            return not _is_low_information_image(_trim_white(image.convert("RGB")))
+    except OSError:
+        return False
 
 
 def _paper_figure_score(image: Image.Image, caption: str, figure_keywords: tuple[str, ...]) -> float:
@@ -790,13 +942,19 @@ def _display_figure_caption(caption: str, display_index: int, source: str = "pap
     caption = _clean_figure_caption(caption)
     if source == "ai":
         body = _short_figure_caption_body(caption)
-        return f"主图：{body}" if body else "主图：方法流程概念图"
-    if source == "paper_composite":
+        return f"概念图：{body}" if body else "概念图：方法流程示意"
+    section = FIGURE_SECTION_SOURCES.get(source)
+    if section:
         body = _short_figure_caption_body(_translate_figure_caption(caption))
-        return f"实验图：{body}" if body else "实验图：论文实验结果汇总"
+        prefix = {
+            "intro": "Introduction 图组",
+            "method": "Method 图组",
+            "experiment": "Experiments 图组",
+        }[section]
+        return f"{prefix}：{body}" if body else prefix
     caption = _translate_figure_caption(caption)
     match = re.match(r"^(?:Fig(?:ure)?\.?)\s*(\d+)\s*[.:]?\s*(.*)$", caption, re.IGNORECASE)
-    prefix = "主图" if display_index == 1 else "论文图"
+    prefix = "论文图"
     if match:
         body = _short_figure_caption_body(match.group(2))
         return f"{prefix}：{body}" if body else prefix
@@ -868,6 +1026,7 @@ def _translate_figure_caption(caption: str) -> str:
     translated = translated.replace("of SA-LIVO", "：SA-LIVO")
     translated = translated.replace("SA-LIVO across", "SA-LIVO 在")
     translated = re.sub(r"\s+", " ", translated).strip(" .。")
+    translated = translated.replace(" ：", "：").replace("： ", "：")
     return translated
 
 
@@ -908,6 +1067,12 @@ def _cover_score(figure: DeepDiveFigure) -> float:
     score = 0.0
     if figure.source == "ai":
         score += 120.0
+    elif figure.source == "method_group":
+        score += 160.0
+    elif figure.source == "intro_group":
+        score += 100.0
+    elif figure.source == "experiment_group":
+        score += 60.0
     elif figure.source == "pdf_page":
         score -= 90.0
     for term in (
@@ -975,44 +1140,63 @@ def _figures_for_variant(
     if variant == "ai":
         ai_cover = _generate_ai_cover_figure(paper, reading, output_dir)
         if ai_cover:
-            remaining = max(max_figures - 1, 0)
-            figures = [ai_cover, *prepared_figures[:remaining]]
+            figures = [ai_cover, *prepared_figures]
             return figures, ai_cover
         print("Gemini cover unavailable; AI version falls back to paper figures.", file=sys.stderr)
 
     cover = _select_cover_figure(prepared_figures)
-    figures = _move_cover_first(prepared_figures, cover)[:max_figures]
-    return figures, cover
+    return prepared_figures, cover
 
 
 def _prepare_article_figures(source_figures: list[DeepDiveFigure], output_dir: Path, max_figures: int) -> list[DeepDiveFigure]:
-    if not source_figures:
+    usable_figures = [figure for figure in source_figures if _figure_file_is_usable(figure.path)]
+    if not usable_figures:
         return []
-    cover = _select_cover_figure(source_figures)
-    ordered = _move_cover_first(source_figures, cover)
+
+    section_candidates: dict[str, list[DeepDiveFigure]] = {section: [] for section in FIGURE_SECTION_ORDER}
+    for figure in usable_figures:
+        section_candidates[_figure_section(figure)].append(figure)
+
     if not _env_bool("DEEPDIVE_EXPERIMENT_COMPOSITE", True):
-        return ordered[:max_figures]
+        grouped: list[DeepDiveFigure] = []
+        used_paths: set[Path] = set()
+        for section in FIGURE_SECTION_ORDER:
+            candidate = next((figure for figure in section_candidates[section] if figure.path not in used_paths), None)
+            if candidate:
+                grouped.append(_as_group_figure(candidate, section))
+                used_paths.add(candidate.path)
+        return grouped or usable_figures[: max(max_figures, len(FIGURE_SECTION_ORDER))]
 
-    cover_path = cover.path if cover else None
-    non_cover = [figure for figure in ordered if figure.path != cover_path]
-    experiment_figures = [figure for figure in non_cover if _is_experiment_figure(figure)]
-    if len(experiment_figures) >= 2:
-        composite = _make_experiment_composite(experiment_figures[:4], output_dir)
-        rest = [figure for figure in non_cover if figure.path not in {item.path for item in experiment_figures[:4]}]
-        return ([cover] if cover else []) + [composite] + rest
-    return ordered[:max_figures]
+    grouped: list[DeepDiveFigure] = []
+    used_paths: set[Path] = set()
+    for section in FIGURE_SECTION_ORDER:
+        candidates = [figure for figure in section_candidates[section] if figure.path not in used_paths]
+        if not candidates:
+            continue
+        group = _make_figure_group(candidates[: _figure_group_limit(section)], output_dir, section)
+        if group:
+            grouped.append(group)
+            used_paths.update(figure.path for figure in candidates[: _figure_group_limit(section)])
+    return grouped or usable_figures[: max(max_figures, len(FIGURE_SECTION_ORDER))]
 
 
-def _make_experiment_composite(figures: list[DeepDiveFigure], output_dir: Path) -> DeepDiveFigure:
-    images: list[Image.Image] = []
+def _figure_group_limit(section: str) -> int:
+    return {"intro": 3, "method": 4, "experiment": 4}.get(section, 3)
+
+
+def _make_figure_group(figures: list[DeepDiveFigure], output_dir: Path, section: str) -> DeepDiveFigure | None:
+    images: list[tuple[DeepDiveFigure, Image.Image]] = []
     for figure in figures:
         try:
             with Image.open(figure.path) as image:
-                images.append(_trim_white(image.convert("RGB")).copy())
+                trimmed = _trim_white(image.convert("RGB"))
+                if _is_low_information_image(trimmed):
+                    continue
+                images.append((figure, trimmed.copy()))
         except OSError:
             continue
     if len(images) < 2:
-        return figures[0]
+        return _as_group_figure(images[0][0], section) if images else None
 
     columns = 2
     rows = (len(images) + columns - 1) // columns
@@ -1021,7 +1205,7 @@ def _make_experiment_composite(figures: list[DeepDiveFigure], output_dir: Path) 
     pad = 18
     label_height = 28
     canvas = Image.new("RGB", (columns * cell_width + (columns + 1) * pad, rows * (cell_height + label_height) + (rows + 1) * pad), "white")
-    for index, image in enumerate(images):
+    for index, (_figure, image) in enumerate(images):
         row = index // columns
         column = index % columns
         fitted = _fit_image(image, cell_width, cell_height)
@@ -1034,11 +1218,27 @@ def _make_experiment_composite(figures: list[DeepDiveFigure], output_dir: Path) 
         label_y = y + cell_height + 6
         _draw_basic_label(canvas, label, label_x, label_y)
 
-    out = output_dir / "experiment-composite.jpg"
+    out = output_dir / f"{section}-group.jpg"
     canvas.save(out, format="JPEG", quality=92, optimize=True, progressive=True)
+    used_figures = [figure for figure, _image in images]
+    caption = _group_caption(section, used_figures)
+    return DeepDiveFigure(out, caption, source=f"{section}_group", children=tuple(figure.caption for figure in used_figures))
+
+
+def _as_group_figure(figure: DeepDiveFigure, section: str) -> DeepDiveFigure:
+    return DeepDiveFigure(figure.path, _group_caption(section, [figure]), source=f"{section}_group", children=(figure.caption,))
+
+
+def _group_caption(section: str, figures: list[DeepDiveFigure]) -> str:
     translated = [_translate_figure_caption(figure.caption) for figure in figures if _has_real_figure_caption(figure.caption)]
-    caption = "组合实验图：" + "；".join(translated[:4]) if translated else "组合实验图：论文实验结果汇总"
-    return DeepDiveFigure(out, caption, source="paper_composite", children=tuple(figure.caption for figure in figures))
+    if translated:
+        return "；".join(translated[:4])
+    fallback = {
+        "intro": "论文背景、场景或问题设置",
+        "method": "论文方法流程与系统结构",
+        "experiment": "论文实验设置、结果与评估",
+    }
+    return fallback.get(section, "论文图组")
 
 
 def _fit_image(image: Image.Image, max_width: int, max_height: int) -> Image.Image:
@@ -1057,6 +1257,70 @@ def _draw_basic_label(image: Image.Image, label: str, x: int, y: int) -> None:
         return
 
 
+def _figure_section(figure: DeepDiveFigure) -> str:
+    if figure.source == "ai":
+        return "intro"
+    section = FIGURE_SECTION_SOURCES.get(figure.source)
+    if section:
+        return section
+    if figure.source == "pdf_page":
+        return "intro"
+    if _is_experiment_figure(figure):
+        return "experiment"
+
+    caption = figure.caption.lower()
+    if any(
+        term in caption
+        for term in (
+            "introduction",
+            "background",
+            "motivation",
+            "problem",
+            "scenario",
+            "attack setup",
+            "data collection",
+            "sensor platform",
+            "infrastructure",
+            "hardware setup",
+            "field test setup",
+            "overview",
+            "system overview",
+            "场景",
+            "背景",
+            "问题",
+            "平台",
+            "设置",
+        )
+    ):
+        return "intro"
+    if any(
+        term in caption
+        for term in (
+            "framework",
+            "architecture",
+            "pipeline",
+            "workflow",
+            "flow",
+            "system overview",
+            "block diagram",
+            "method",
+            "network",
+            "algorithm",
+            "model",
+            "proposed",
+            "框架",
+            "架构",
+            "流程",
+            "系统",
+            "结构",
+            "方法",
+            "算法",
+        )
+    ):
+        return "method"
+    return "method"
+
+
 def _is_experiment_figure(figure: DeepDiveFigure) -> bool:
     if figure.source in {"ai", "pdf_page"}:
         return False
@@ -1067,6 +1331,8 @@ def _is_experiment_figure(figure: DeepDiveFigure) -> bool:
         term in caption
         for term in (
             "experiment",
+            "experimental setup",
+            "evaluation setup",
             "evaluation",
             "result",
             "mapping",
@@ -1077,6 +1343,14 @@ def _is_experiment_figure(figure: DeepDiveFigure) -> bool:
             "benchmark",
             "performance",
             "dataset",
+            "runtime",
+            "memory",
+            "computation",
+            "computing",
+            "time budget",
+            "wall-time",
+            "latency",
+            "speed",
         )
     )
 
@@ -1221,21 +1495,22 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 def _figure_pool_size(max_figures: int) -> int:
     try:
-        configured = int(os.getenv("DEEPDIVE_FIGURE_POOL", "6"))
+        configured = int(os.getenv("DEEPDIVE_FIGURE_POOL", "12"))
     except ValueError:
-        configured = 6
+        configured = 12
     return max(max_figures, configured)
 
 
 def _image_runtime_mode(variant: str, figures: list[DeepDiveFigure]) -> str:
+    has_groups = any(figure.source in FIGURE_SECTION_SOURCES for figure in figures)
     if variant == "ai":
         if any(figure.source == "ai" for figure in figures):
-            return "AI 主图 + 论文图"
-        if any(figure.source == "paper_composite" for figure in figures):
-            return "AI 不可用，已回退论文图 + 实验组合图"
+            return "AI 概念图 + 论文分章节图组" if has_groups else "AI 概念图 + 论文图"
+        if has_groups:
+            return "AI 不可用，已回退论文分章节图组"
         return "AI 不可用，已回退论文图"
-    if any(figure.source == "paper_composite" for figure in figures):
-        return "论文原图 + 实验组合图"
+    if has_groups:
+        return "论文分章节图组"
     return "论文原图"
 
 
@@ -1296,7 +1571,8 @@ def _request_gemini_text_polish(api_key: str, paper: dict[str, Any], texts: dict
     prompt = (
         "你是中文科技公众号编辑。请润色下面这组论文解读文案，只提升自然度、顺滑度和可读性，"
         "不要新增事实，不要删除关键风险机制、方法机制、实验机制，不要加入“AI”“自动生成”“邮件指定”等表述。"
-        "避免使用“线索落在”“数字线索”“短句线索”这类模板化句式。"
+        "避免使用“通常”“一般”“线索落在”“数字线索”“短句线索”这类模板化句式。"
+        "遇到图组说明时保留“这一组图”或“这一组”的表达，不要改成“这张图”。"
         "保持每个 key 对应一段中文文本，保留英文专有名词和单位。只返回 JSON 对象，键名必须与输入一致。\n\n"
         f"论文题目：{_display_title(paper)}\n"
         "待润色 JSON：\n"
@@ -1370,8 +1646,31 @@ def _extract_json_object(text: str) -> str:
 def _clean_polished_text(text: str) -> str:
     text = _clean_text(text)
     text = text.strip("` ")
-    if len(text) > 650:
-        text = text[:650].rstrip("，,；;。 ") + "。"
+    text = _remove_template_phrases(text)
+    limit = 900
+    if len(text) > limit:
+        sentence_end = max(text.rfind("。", 0, limit), text.rfind("！", 0, limit), text.rfind("？", 0, limit))
+        if sentence_end > int(limit * 0.55):
+            return text[: sentence_end + 1]
+        text = text[:limit].rstrip("，,；;。 ") + "。"
+    return text
+
+
+def _remove_template_phrases(text: str) -> str:
+    replacements = (
+        ("通常置于", "放在"),
+        ("通常放在", "放在"),
+        ("通常出现在", "出现在"),
+        ("通常位于", "位于"),
+        ("通常用于", "用于"),
+        ("通常在", "在"),
+        ("一般来说，", ""),
+        ("一般而言，", ""),
+        ("一般", ""),
+        ("通常", ""),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
     return text
 
 
@@ -1585,7 +1884,7 @@ def _figure_reading(paper: dict[str, Any], reading: PaperReading, figure: DeepDi
     translation = f"原文图注可以译为：“{translated_caption}”。" if _has_real_figure_caption(caption) and translated_caption else ""
     if figure.source == "ai":
         return (
-            f"这张主图是辅助示意，用来把论文里的{profile['problem']}和{profile['method']}放到同一张画面里。"
+            f"这张概念图是辅助示意，用来把论文里的{profile['problem']}和{profile['method']}放到同一张画面里。"
             "它不替代论文原图，只负责让读者先有一个直观印象，再回到后面的原图和实验细节。"
         )
     if figure.source == "pdf_page":
@@ -1593,18 +1892,36 @@ def _figure_reading(paper: dict[str, Any], reading: PaperReading, figure: DeepDi
             "这是一页论文截图，适合作为全文入口。它的价值不是展示某个具体实验图，"
             f"而是帮读者先看到论文如何引出{profile['problem']}，再进入方法和实验部分。"
         )
-    if figure.source == "paper_composite":
+    section = FIGURE_SECTION_SOURCES.get(figure.source)
+    if section:
         translated = [_translate_figure_caption(caption) for caption in figure.children if _has_real_figure_caption(caption)]
+        prefix = "原图注可译为"
         if translated:
             joined = "；".join(translated[:4])
+            if section == "intro":
+                return (
+                    f"{prefix}：“{joined}”。"
+                    f"这一组放在 Introduction 后面，先交代论文面对的场景、平台或风险来源，"
+                    f"让读者知道{profile['problem']}不是抽象概念，而是会在真实输入链路里出现的问题。"
+                )
+            if section == "method":
+                return (
+                    f"{prefix}：“{joined}”。"
+                    "这一组放在 Method 后面，重点看输入、处理模块和输出之间怎样连接。"
+                    f"读到这里，可以把它当成{profile['method']}的路线图，再回到正文看每个模块为什么存在。"
+                )
             return (
-                f"这是一组实验图合成预览，原图注大致对应：“{joined}”。"
-                "放在一起看，重点不是逐个抠细节，而是判断作者是否覆盖了足够多的场景、轨迹或结果形态，"
-                f"以及这些结果能否支撑{profile['experiment']}这一部分的结论。"
+                f"{prefix}：“{joined}”。"
+                "这一组放在 Experiments 后面，适合把场景、指标和结果放在一起看："
+                f"它要回答的不是单张图好不好看，而是这些证据能否支撑{profile['experiment']}。"
             )
+        if section == "intro":
+            return f"这一组图放在 Introduction 后面，用来交代论文的研究场景和问题来源，帮助读者先理解{profile['problem']}。"
+        if section == "method":
+            return f"这一组图放在 Method 后面，用来说明{profile['method']}怎样从输入走到输出。"
         return (
-            "这是一组实验图合成预览。放在一起看，重点不是逐个抠细节，"
-            f"而是判断作者是否覆盖了足够多的场景、轨迹或结果形态，以及这些结果能否支撑{profile['experiment']}这一部分的结论。"
+            "这一组图放在 Experiments 后面，重点看数据、指标、场景和结果是否互相对得上，"
+            f"以及它们能否支撑{profile['experiment']}。"
         )
     if any(term in lowered for term in ("setup", "framework", "architecture", "system", "overview", "pipeline", "workflow", "flow")):
         return (
@@ -1628,7 +1945,7 @@ def _figure_reading(paper: dict[str, Any], reading: PaperReading, figure: DeepDi
         )
     if index == 1:
         return (
-            f"{translation}这张主图先帮读者建立整体印象：论文讨论的对象是什么，"
+            f"{translation}这张图先帮读者建立整体印象：论文讨论的对象是什么，"
             "主要模块在哪里，最后希望解决什么工程问题。"
         )
     if not translation:

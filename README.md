@@ -169,7 +169,7 @@ PYTHONPATH=src python scripts/upload_cover_to_wechat.py outputs/wechat-cover-gns
 ./scripts/generate_deepdives.sh draft
 ```
 
-论文解读会按“故事导读、章节讲解、方法拆解、图解、实验、局限、工程复现”展开；`DEEPDIVE_PAPER_COVER=1` 时，会优先从论文 PDF 里挑 framework / architecture / pipeline / system 等流程图或框架图作为公众号草稿封面，并把这张图放到正文主图位置。
+论文解读会按论文自身的结构展开：Introduction 讲背景和问题，Method 讲方法与系统设计，Experiments 讲实验设置和结果，Discussion 讲结论、边界与复现。`DEEPDIVE_PAPER_COVER=1` 时，会优先从论文 PDF 里挑 framework / architecture / pipeline / system 等流程图或框架图作为公众号草稿封面；正文图片会按 Introduction / Method / Experiments 分章节组图，而不是把所有图片堆到同一个图片区块里。
 
 如果想同时对比两种配图方式，可以运行：
 
@@ -177,9 +177,9 @@ PYTHONPATH=src python scripts/upload_cover_to_wechat.py outputs/wechat-cover-gns
 ./scripts/generate_deepdives.sh none both
 ```
 
-其中 `paper` 版本只使用论文原图，并按 `DEEPDIVE_FIGURE_KEYWORDS` 里的关键词优先匹配流程图、框架图、系统图；`ai` 版本会用 `GEMINI_API_KEY` 生成 16:9 概念主图，再保留少量论文原图辅助解读。默认模式由 `.env` 里的 `DEEPDIVE_IMAGE_MODE=paper|ai|both` 控制。注意：`both` 是对比模式，会让每篇论文生成两份草稿，例如 `DEEPDIVE_LIMIT=3` 时会生成 6 篇草稿。
+其中 `paper` 版本只使用论文原图，并按 `DEEPDIVE_FIGURE_KEYWORDS` 里的关键词优先匹配流程图、框架图、系统图；`ai` 版本会用 `GEMINI_API_KEY` 生成 16:9 概念图，再保留论文分章节图组辅助解读。默认模式由 `.env` 里的 `DEEPDIVE_IMAGE_MODE=paper|ai|both` 控制。注意：`both` 是对比模式，会让每篇论文生成两份草稿，例如 `DEEPDIVE_LIMIT=3` 时会生成 6 篇草稿。
 
-正文文案默认优先用 Gemini 做轻量润色，API 不可用、额度不足或未配置 Key 时会自动回退到传统本地文案；邮件通知里会标明“解读模式：AI 润色（Gemini）”或“传统模板”。实验/结果类图片会优先合成为一张组合图，再做整体解释，避免一张张图机械铺开。
+正文文案默认优先用 Gemini 做轻量润色，API 不可用、额度不足或未配置 Key 时会自动回退到传统本地文案；邮件通知里会标明“解读模式：AI 润色（Gemini）”或“传统模板”。图片会过滤纯黑、纯白或低信息量抽图，再按介绍、方法、实验三类合成为章节图组，避免一张张图机械铺开。
 
 确认草稿后也可以提交发布：
 

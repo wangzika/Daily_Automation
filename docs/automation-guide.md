@@ -20,8 +20,8 @@
 4. 单篇论文解读文章  
    自动下载论文 PDF，提取论文中的关键图，生成更详细的论文解读文章，并创建微信公众号草稿。
 
-5. 论文图作为封面  
-   单篇论文解读会优先从 PDF 中选择 framework、architecture、pipeline、system 等流程图或框架图，作为公众号草稿封面和正文主图。
+5. 论文图作为封面和章节图组  
+   单篇论文解读会优先从 PDF 中选择 framework、architecture、pipeline、system 等流程图或框架图作为公众号草稿封面；正文图片会按 Introduction、Method、Experiments 分章节组图，并过滤纯黑、纯白或低信息量抽图。
 
 6. 周报热点汇总  
    每周自动生成热点方向汇总，包含方向趋势、高频关键词、有代码/复现线索和本周值得追的论文。
@@ -302,8 +302,8 @@ launchctl kickstart -k gui/$(id -u)/com.codex.daily-gnss-slam-digest
 
 | 模式 | 用法 | 说明 |
 | --- | --- | --- |
-| `paper` | `./scripts/generate_deepdives.sh draft paper` | 只提取论文 PDF 原图，并按 `DEEPDIVE_FIGURE_KEYWORDS` 优先选择 framework、pipeline、overview、system、flow 等流程图或框架图 |
-| `ai` | `./scripts/generate_deepdives.sh draft ai` | 用 `GEMINI_API_KEY` 生成 16:9 概念主图，再搭配论文原图 |
+| `paper` | `./scripts/generate_deepdives.sh draft paper` | 只提取论文 PDF 原图，并按 Introduction、Method、Experiments 生成章节图组 |
+| `ai` | `./scripts/generate_deepdives.sh draft ai` | 用 `GEMINI_API_KEY` 生成 16:9 概念图，再搭配论文章节图组 |
 | `both` | `./scripts/generate_deepdives.sh draft both` | 同一篇论文生成原图版和 AI 版两份草稿，便于在公众号后台对比 |
 
 注意：`both` 是对比模式，会让每篇论文生成两份草稿。例如 `DEEPDIVE_LIMIT=3` 时，最终会进入草稿箱 6 篇。

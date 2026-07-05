@@ -4,7 +4,7 @@ import unittest
 import tempfile
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from daily_gnss_slam_digest.deepdive import (
     DeepDiveFigure,
@@ -17,6 +17,7 @@ from daily_gnss_slam_digest.deepdive import (
     _figure_reading,
     _file_url,
     _image_variants,
+    _is_low_information_image,
     _prepare_article_figures,
     build_deepdive_html,
     build_deepdive_markdown,
@@ -97,13 +98,14 @@ class DeepDiveContentTest(unittest.TestCase):
         markdown = build_deepdive_markdown(paper, reading, figures, {"figure_1": "ai-cover.jpg"})
         html = build_deepdive_html(paper, reading, figures, {"figure_1": "ai-cover.jpg"})
 
-        self.assertIn("主图：授时欺骗与保护级的概念示意", markdown)
-        self.assertIn("主图为辅助示意图", markdown)
-        self.assertIn("主图为辅助示意图", html)
+        self.assertIn("概念图：授时欺骗与保护级的概念示意", markdown)
+        self.assertIn("概念图为辅助示意图", markdown)
+        self.assertIn("概念图为辅助示意图", html)
+        self.assertNotIn("主图", markdown)
 
     def test_figure_caption_removes_duplicate_number_prefixes(self) -> None:
         caption = "图 1 . Fig. 1: System Overview. The proposed framework."
-        self.assertEqual(_display_figure_caption(caption, 1), "主图：系统总览")
+        self.assertEqual(_display_figure_caption(caption, 1), "论文图：系统总览")
 
     def test_figure_reading_translates_caption_without_keyword_template(self) -> None:
         paper = {
@@ -148,24 +150,50 @@ class DeepDiveContentTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             cover = tmp_path / "cover.jpg"
+            method = tmp_path / "method.jpg"
             result_a = tmp_path / "result-a.jpg"
             result_b = tmp_path / "result-b.jpg"
-            Image.new("RGB", (800, 360), "white").save(cover)
-            Image.new("RGB", (800, 360), "gray").save(result_a)
-            Image.new("RGB", (800, 360), "silver").save(result_b)
+            _sample_figure(cover, "system")
+            _sample_figure(method, "pipeline")
+            _sample_figure(result_a, "map")
+            _sample_figure(result_b, "trajectory")
 
             figures = [
                 DeepDiveFigure(cover, "Fig. 1. System overview of SA-LIVO."),
+                DeepDiveFigure(method, "Fig. 2. Proposed pipeline of the subspace-aware fusion module."),
                 DeepDiveFigure(result_a, "Fig. 2. Representative mapping results of SA-LIVO across diverse environments."),
                 DeepDiveFigure(result_b, "Fig. 3. Trajectory evaluation on campus sequences."),
             ]
 
             prepared = _prepare_article_figures(figures, tmp_path, 2)
 
+            self.assertEqual([figure.source for figure in prepared], ["intro_group", "method_group", "experiment_group"])
             self.assertEqual(prepared[0].path, cover)
-            self.assertEqual(prepared[1].source, "paper_composite")
-            self.assertTrue(prepared[1].path.exists())
-            self.assertTrue(_display_figure_caption(prepared[1].caption, 2, prepared[1].source).startswith("实验图："))
+            self.assertEqual(prepared[1].path, method)
+            self.assertTrue(prepared[2].path.exists())
+            self.assertTrue(_display_figure_caption(prepared[2].caption, 3, prepared[2].source).startswith("Experiments 图组："))
+
+    def test_black_figures_are_filtered_before_grouping(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            black = tmp_path / "black.jpg"
+            method = tmp_path / "method.jpg"
+            Image.new("RGB", (900, 520), "black").save(black)
+            _sample_figure(method, "pipeline")
+
+            self.assertTrue(_is_low_information_image(Image.open(black).convert("RGB")))
+
+            prepared = _prepare_article_figures(
+                [
+                    DeepDiveFigure(black, "Fig. 4. Evaluation of computation times per LiDAR scan."),
+                    DeepDiveFigure(method, "Fig. 1. Proposed pipeline."),
+                ],
+                tmp_path,
+                2,
+            )
+
+            self.assertEqual(len(prepared), 1)
+            self.assertEqual(prepared[0].path, method)
 
     def test_polished_text_overrides_traditional_text(self) -> None:
         paper = {"title": "Example", "authors": [], "abstract": "GNSS spoofing risk.", "matched_terms": ["gnss"]}
@@ -197,6 +225,9 @@ class DeepDiveContentTest(unittest.TestCase):
 
         for text in (markdown, html):
             self.assertIn("阅读原文", text)
+            self.assertIn("Introduction：研究背景与问题", text)
+            self.assertIn("Method：方法与系统设计", text)
+            self.assertIn("Experiments：实验设置与结果", text)
             self.assertIn("原文页面", text)
             self.assertIn("PDF下载", text)
             self.assertIn("代码/项目", text)
@@ -221,6 +252,18 @@ class DeepDiveContentTest(unittest.TestCase):
             ],
         )
         self.assertTrue(_file_url("outputs/deepdives/example/article.html").startswith("file://"))
+
+
+def _sample_figure(path: Path, label: str) -> None:
+    image = Image.new("RGB", (900, 520), "white")
+    draw = ImageDraw.Draw(image)
+    for index in range(6):
+        x0 = 60 + index * 130
+        y0 = 80 + (index % 2) * 120
+        draw.rectangle((x0, y0, x0 + 90, y0 + 70), outline=(18, 80, 92), width=5)
+        draw.line((x0 + 90, y0 + 35, min(x0 + 150, 860), y0 + 35), fill=(0, 150, 130), width=4)
+    draw.text((70, 430), label, fill=(20, 40, 45))
+    image.save(path)
 
 
 if __name__ == "__main__":
