@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -687,8 +688,25 @@ def _download(url: str, output: Path) -> None:
     if output.exists() and output.stat().st_size > 0:
         return
     request = urllib.request.Request(url, headers={"User-Agent": "daily-gnss-slam-digest/0.1"})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        output.write_bytes(response.read())
+    last_error: BaseException | None = None
+    for attempt in range(1, _download_retries() + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                output.write_bytes(response.read())
+            return
+        except (OSError, TimeoutError, urllib.error.URLError) as exc:
+            last_error = exc
+            if attempt < _download_retries():
+                time.sleep(min(2 * attempt, 8))
+    if last_error:
+        raise last_error
+
+
+def _download_retries() -> int:
+    try:
+        return max(1, int(os.getenv("DEEPDIVE_DOWNLOAD_RETRIES", "3")))
+    except ValueError:
+        return 3
 
 
 def _extract_figure_captions(pdf_path: Path) -> list[str]:

@@ -210,6 +210,14 @@ class KeywordCommandTest(unittest.TestCase):
         limit_index = args.index("--limit")
         self.assertEqual(args[limit_index + 1], "1")
 
+    def test_deepdive_command_defaults_to_full_digest_limit(self) -> None:
+        command = PaperCommandForTest(deepdive_limit=None)
+
+        args = _deepdive_command(command, Path("digest.json"), Path("run"), "python", {})
+
+        limit_index = args.index("--limit")
+        self.assertEqual(args[limit_index + 1], "5")
+
     def test_with_publish_mode_rewrites_mode_argument(self) -> None:
         args = ["python", "-m", "daily_gnss_slam_digest.deepdive", "--publish-mode", "draft"]
 

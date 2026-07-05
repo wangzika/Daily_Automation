@@ -33,7 +33,7 @@ fi
 
 MODE="${1:-none}"
 IMAGE_MODE="${2:-${DEEPDIVE_IMAGE_MODE:-paper}}"
-LIMIT="${DEEPDIVE_LIMIT:-3}"
+LIMIT="${DEEPDIVE_LIMIT:-${DIGEST_LIMIT:-5}}"
 TODAY="${DIGEST_DATE:-$(date +%F)}"
 DIGEST_DIR="${DIGEST_OUTPUT_DIR:-outputs}"
 INPUT_JSON="${DIGEST_JSON:-${DIGEST_DIR}/${TODAY}-gnss-slam-digest.json}"

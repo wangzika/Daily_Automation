@@ -306,7 +306,7 @@ launchctl kickstart -k gui/$(id -u)/com.codex.daily-gnss-slam-digest
 | `ai` | `./scripts/generate_deepdives.sh draft ai` | 用 `GEMINI_API_KEY` 生成 16:9 概念图，再搭配论文章节图组 |
 | `both` | `./scripts/generate_deepdives.sh draft both` | 同一篇论文生成原图版和 AI 版两份草稿，便于在公众号后台对比 |
 
-注意：`both` 是对比模式，会让每篇论文生成两份草稿。例如 `DEEPDIVE_LIMIT=3` 时，最终会进入草稿箱 6 篇。
+注意：`both` 是对比模式，会让每篇论文生成两份草稿。默认 `DEEPDIVE_LIMIT=5`，会覆盖每日推荐里的 5 篇论文；如果使用 `both`，最终会进入草稿箱 10 篇。
 
 渲染裁剪参数：
 
@@ -314,6 +314,7 @@ launchctl kickstart -k gui/$(id -u)/com.codex.daily-gnss-slam-digest
 | --- | --- | --- |
 | `DEEPDIVE_RENDER_FIGURE_PAGES` | `12` | 最多渲染并扫描 PDF 前多少页的图注 |
 | `DEEPDIVE_RENDER_FIGURE_DPI` | `200` | 页面渲染分辨率；更高更清晰但更慢 |
+| `DEEPDIVE_DOWNLOAD_RETRIES` | `3` | 单篇论文 PDF 下载失败时的重试次数 |
 
 正文文案默认 `DEEPDIVE_TEXT_POLISH_MODE=api`，会优先调用 Gemini 做润色；如果 API 不可用、额度不足或没有配置 Key，会自动回退到传统本地文案。草稿邮件会标明“解读模式”和“配图模式”，例如“AI 润色（Gemini）”或“传统模板”。实验/结果类图片默认 `DEEPDIVE_EXPERIMENT_COMPOSITE=1`，会合成为一张组合图再做整体解释。
 

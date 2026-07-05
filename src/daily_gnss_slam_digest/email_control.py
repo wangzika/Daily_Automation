@@ -384,7 +384,7 @@ def _deepdive_command(
         "--output-dir",
         str(run_dir / "deepdives"),
         "--limit",
-        str(_command_int(command.deepdive_limit, env.get("DEEPDIVE_LIMIT"), 3)),
+        str(_command_int(command.deepdive_limit, env.get("DEEPDIVE_LIMIT"), 5)),
         "--figures",
         str(_command_int(None, env.get("DEEPDIVE_FIGURES"), 2)),
         "--image-mode",
