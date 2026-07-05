@@ -587,6 +587,56 @@ outputs/logs/email-commands.out.log
 outputs/logs/email-commands.err.log
 ```
 
+### 自动清理策略
+
+每日总控 `scripts/daily_automation.sh` 会在正式生成前运行：
+
+```bash
+./scripts/cleanup_outputs.sh
+```
+
+单篇论文解读 `scripts/generate_deepdives.sh` 也会在生成前清空本次解读输出目录，默认是：
+
+```text
+outputs/deepdives/
+```
+
+默认清理规则：
+
+| 类型 | 默认行为 |
+| --- | --- |
+| 测试/检查目录 | 删除 `outputs/deepdives-*-check`、`outputs/deepdives-*-test` 等临时目录 |
+| 论文解读目录 | 每次生成前清空目标目录，避免旧文章混入新草稿 |
+| 每日推荐文件 | 保留最近 8 天 |
+| 邮件指令产物 | 保留最近 3 次运行，同时最多保留 3 天 |
+| 周报文件 | 保留 70 天 |
+| 日志文件 | 保留 14 天 |
+| arXiv 缓存 | 默认不删除，避免频繁请求导致限流 |
+
+可以在 `.env` 里调整：
+
+```bash
+OUTPUT_CLEAN_ENABLED=1
+DEEPDIVE_CLEAN_BEFORE_RUN=1
+OUTPUT_DAILY_RETENTION_DAYS=8
+OUTPUT_EMAIL_RETENTION_DAYS=3
+OUTPUT_EMAIL_KEEP_LATEST=3
+OUTPUT_WEEKLY_RETENTION_DAYS=70
+OUTPUT_LOG_RETENTION_DAYS=14
+```
+
+如果只是想预览会删什么，不真正删除：
+
+```bash
+./scripts/cleanup_outputs.sh --dry-run
+```
+
+如果临时想保留所有历史输出：
+
+```bash
+OUTPUT_CLEAN_ENABLED=0 ./scripts/daily_automation.sh
+```
+
 ## 13. 常见问题
 
 ### 13.1 改了 `.env` 时间，为什么没有按新时间跑？

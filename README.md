@@ -213,6 +213,13 @@ EMAIL_NOTIFY_INCLUDE_QUICK_COMMANDS=1
 WEEKLY_SUMMARY_ENABLED=1
 WEEKLY_SUMMARY_DAY=7
 WEEKLY_SUMMARY_DAYS=7
+OUTPUT_CLEAN_ENABLED=1
+DEEPDIVE_CLEAN_BEFORE_RUN=1
+OUTPUT_DAILY_RETENTION_DAYS=8
+OUTPUT_EMAIL_RETENTION_DAYS=3
+OUTPUT_EMAIL_KEEP_LATEST=3
+OUTPUT_WEEKLY_RETENTION_DAYS=70
+OUTPUT_LOG_RETENTION_DAYS=14
 TOPIC_ROTATION_ENABLED=on
 GITHUB_REPO_URL=git@github.com:your-name/your-repo.git
 GITHUB_BRANCH=master
@@ -220,7 +227,7 @@ GIT_AUTHOR_NAME="GNSS Paper Bot"
 GIT_AUTHOR_EMAIL=your@email.com
 ```
 
-`AUTOMATION_WECHAT_MODE` 和 `AUTOMATION_DEEPDIVE_MODE` 支持 `none`、`draft`、`publish`。如果 launchd 使用的系统 Python 缺少依赖，可以把 `AUTOMATION_PYTHON` 设置为可用解释器，例如 `/Users/wangzhibo/miniconda3/bin/python`。总控脚本会自动设置 `EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES=1`，只保留最后一封总结邮件；如果想调试子步骤邮件，可以在 `.env` 里显式设为 `0`。如果当前目录还不是 git 仓库，脚本会在 `GITHUB_REPO_URL` 存在时自动 `git init`、添加 `origin` 并推送。`.env`、日志、论文 PDF 和中间缓存不会提交；最终文章、正文图和配置代码会提交。
+`AUTOMATION_WECHAT_MODE` 和 `AUTOMATION_DEEPDIVE_MODE` 支持 `none`、`draft`、`publish`。如果 launchd 使用的系统 Python 缺少依赖，可以把 `AUTOMATION_PYTHON` 设置为可用解释器，例如 `/Users/wangzhibo/miniconda3/bin/python`。总控脚本会自动设置 `EMAIL_NOTIFY_SUPPRESS_STEP_MESSAGES=1`，只保留最后一封总结邮件；如果想调试子步骤邮件，可以在 `.env` 里显式设为 `0`。每次自动化开始会清理 `outputs` 里的测试目录、过期日报、旧邮件指令产物和旧日志；每次生成论文解读前会清空本次解读输出目录，避免混入上一轮旧文章。需要临时保留全部输出时，把 `OUTPUT_CLEAN_ENABLED=0`。如果当前目录还不是 git 仓库，脚本会在 `GITHUB_REPO_URL` 存在时自动 `git init`、添加 `origin` 并推送。`.env`、日志、论文 PDF 和中间缓存不会提交；最终文章、正文图和配置代码会提交。
 
 也可以开启邮件指令控制：发一封主题包含 `论文指令` 的邮件，在正文写 `关键词`、`任务`、`模式`，脚本会按指定关键词生成推荐、论文解读或周报。邮件扫描会同时检查未读邮件和最近几天的已读邮件，并用本地指纹文件避免重复执行。
 

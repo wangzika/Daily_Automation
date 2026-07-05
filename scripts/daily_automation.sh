@@ -255,6 +255,7 @@ if ! validate_mode "$DEEPDIVE_MODE"; then
 fi
 
 if [[ $STATUS -eq 0 ]]; then
+  run_step "Clean old output files" ./scripts/cleanup_outputs.sh --output-root "${DIGEST_OUTPUT_DIR:-outputs}" --run-date "$RUN_DATE"
   run_step "Generate daily digest and WeChat draft" ./scripts/publish_now.sh "$WECHAT_MODE"
   DIGEST_RC=$LAST_STEP_RC
   if [[ -f "$DIGEST_JSON" ]]; then

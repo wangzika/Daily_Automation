@@ -37,6 +37,7 @@ LIMIT="${DEEPDIVE_LIMIT:-3}"
 TODAY="${DIGEST_DATE:-$(date +%F)}"
 DIGEST_DIR="${DIGEST_OUTPUT_DIR:-outputs}"
 INPUT_JSON="${DIGEST_JSON:-${DIGEST_DIR}/${TODAY}-gnss-slam-digest.json}"
+OUTPUT_DIR="${DEEPDIVE_OUTPUT_DIR:-outputs/deepdives}"
 
 if [[ "$MODE" != "none" && "$MODE" != "draft" && "$MODE" != "publish" ]]; then
   echo "Usage: $0 [none|draft|publish] [paper|ai|both]" >&2
@@ -88,9 +89,16 @@ if [[ ! -f "$INPUT_JSON" ]]; then
   fi
 fi
 
+if [[ "${OUTPUT_CLEAN_ENABLED:-1}" != "0" && "${OUTPUT_CLEAN_ENABLED:-1}" != "false" && "${OUTPUT_CLEAN_ENABLED:-1}" != "False" && "${OUTPUT_CLEAN_ENABLED:-1}" != "no" && "${OUTPUT_CLEAN_ENABLED:-1}" != "off" ]]; then
+  ./scripts/cleanup_outputs.sh \
+    --output-root "$DIGEST_DIR" \
+    --run-date "$TODAY" \
+    --deepdives-output "$OUTPUT_DIR"
+fi
+
 PYTHONPATH="$PROJECT_DIR/src${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON" -m daily_gnss_slam_digest.deepdive \
   --input-json "$INPUT_JSON" \
-  --output-dir "${DEEPDIVE_OUTPUT_DIR:-outputs/deepdives}" \
+  --output-dir "$OUTPUT_DIR" \
   --limit "$LIMIT" \
   --figures "${DEEPDIVE_FIGURES:-2}" \
   --image-mode "$IMAGE_MODE" \
