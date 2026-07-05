@@ -11,6 +11,7 @@ from daily_gnss_slam_digest.deepdive import (
     FigureCaptionAnchor,
     PaperReading,
     TextPolishResult,
+    _clean_text_polish_payload,
     _crop_rendered_figure,
     _content_mode_label,
     _display_figure_caption,
@@ -19,6 +20,7 @@ from daily_gnss_slam_digest.deepdive import (
     _domain_profile,
     _evidence_summary,
     _extract_base64_image,
+    _extract_openai_message_text,
     _figure_reading,
     _figure_section,
     _has_real_figure_caption,
@@ -28,6 +30,7 @@ from daily_gnss_slam_digest.deepdive import (
     _parse_caption_anchors,
     _prepare_article_figures,
     _sentence_candidates,
+    _text_polish_provider_order,
     _usable_detail_tokens,
     _usable_numbers,
     build_deepdive_html,
@@ -413,7 +416,19 @@ class DeepDiveContentTest(unittest.TestCase):
 
         self.assertIn("润色后的一句话。", markdown)
         self.assertEqual(_content_mode_label("api"), "AI 润色（Gemini）")
+        self.assertEqual(_content_mode_label("gemini"), "AI 润色（Gemini）")
+        self.assertEqual(_content_mode_label("siliconflow"), "AI 润色（SiliconFlow）")
         self.assertEqual(_content_mode_label("fallback"), "传统模板（AI 不可用时回退）")
+
+    def test_text_polish_provider_order_and_openai_payload(self) -> None:
+        self.assertEqual(_text_polish_provider_order("api"), ("gemini", "siliconflow"))
+        self.assertEqual(_text_polish_provider_order("siliconflow"), ("siliconflow",))
+
+        payload = {"choices": [{"message": {"content": '{"one_sentence":"润色后的文本。"}'}}]}
+        self.assertEqual(_extract_openai_message_text(payload), '{"one_sentence":"润色后的文本。"}')
+        cleaned = _clean_text_polish_payload({"one_sentence": "润色后的文本。", "unknown": "忽略"}, {"one_sentence": "原文"})
+
+        self.assertEqual(cleaned, {"one_sentence": "润色后的文本。"})
 
     def test_article_includes_read_original_links(self) -> None:
         paper = {

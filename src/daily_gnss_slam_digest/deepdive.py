@@ -330,7 +330,7 @@ def _notify_deepdive_drafts_created(
             lines.append("   阅读原文：")
             lines.extend(f"   - {line}" for line in source_lines)
         reason = str(draft.get("content_reason") or "")
-        if draft.get("content_mode") != "api" and reason:
+        if str(draft.get("content_mode") or "") not in {"api", "gemini", "siliconflow"} and reason:
             lines.append(f"   回退原因：{reason}")
 
     if publish_blocked_reason:
@@ -350,8 +350,10 @@ def _notify_deepdive_drafts_created(
 
 
 def _content_mode_label(mode: str) -> str:
-    if mode == "api":
+    if mode in {"api", "gemini"}:
         return "AI 润色（Gemini）"
+    if mode == "siliconflow":
+        return "AI 润色（SiliconFlow）"
     if mode == "disabled":
         return "传统模板"
     return "传统模板（AI 不可用时回退）"
@@ -2081,26 +2083,81 @@ def _generate_text_polish(paper: dict[str, Any], reading: PaperReading, figures:
     mode = os.getenv("DEEPDIVE_TEXT_POLISH_MODE", "api").strip().lower()
     if mode in {"0", "false", "no", "off", "fallback", "traditional"}:
         return TextPolishResult("fallback", "text polish disabled")
-    api_key = _first_env("GEMINI_API_KEY", "GOOGLE_API_KEY")
-    if not api_key:
-        return TextPolishResult("fallback", "missing GEMINI_API_KEY")
 
     raw_texts = _text_polish_inputs(paper, reading, figures)
-    try:
-        polished = _request_gemini_text_polish(api_key, paper, raw_texts)
-    except (OSError, ValueError, RuntimeError, urllib.error.URLError, json.JSONDecodeError) as exc:
-        reason = _short_error(str(exc))
-        print(f"Gemini text polish skipped: {reason}", file=sys.stderr)
-        return TextPolishResult("fallback", reason)
+    reasons: list[str] = []
+    for provider in _text_polish_provider_order(mode):
+        try:
+            result = _run_text_polish_provider(provider, paper, raw_texts)
+        except (OSError, ValueError, RuntimeError, urllib.error.URLError, json.JSONDecodeError) as exc:
+            reason = _short_error(str(exc))
+            reasons.append(f"{_text_polish_provider_name(provider)}: {reason}")
+            print(f"{_text_polish_provider_name(provider)} text polish skipped: {reason}", file=sys.stderr)
+            continue
+        cleaned = _clean_text_polish_payload(result, raw_texts)
+        if cleaned:
+            return TextPolishResult(provider, _text_polish_provider_reason(provider), cleaned)
+        reason = f"{_text_polish_provider_name(provider)} returned no usable text"
+        reasons.append(reason)
+        print(f"{reason}; trying next provider.", file=sys.stderr)
 
-    cleaned = {
+    return TextPolishResult("fallback", "; ".join(reasons) or "no text polish provider configured")
+
+
+def _text_polish_provider_order(mode: str) -> tuple[str, ...]:
+    if mode in {"gemini", "google"}:
+        return ("gemini",)
+    if mode in {"siliconflow", "silicon", "sf"}:
+        return ("siliconflow",)
+    configured = os.getenv("DEEPDIVE_TEXT_POLISH_PROVIDERS", "gemini,siliconflow")
+    providers = []
+    for item in re.split(r"[,，;；\s]+", configured):
+        provider = item.strip().lower()
+        if provider in {"google"}:
+            provider = "gemini"
+        if provider in {"silicon", "sf"}:
+            provider = "siliconflow"
+        if provider in {"gemini", "siliconflow"} and provider not in providers:
+            providers.append(provider)
+    return tuple(providers or ["gemini", "siliconflow"])
+
+
+def _run_text_polish_provider(provider: str, paper: dict[str, Any], raw_texts: dict[str, str]) -> dict[str, str]:
+    if provider == "gemini":
+        api_key = _first_env("GEMINI_API_KEY", "GOOGLE_API_KEY")
+        if not api_key:
+            raise RuntimeError("missing GEMINI_API_KEY")
+        return _request_gemini_text_polish(api_key, paper, raw_texts)
+    if provider == "siliconflow":
+        api_key = _first_env("SILICONFLOW_API_KEY", "SILICONFLOW_TEXT_API_KEY")
+        if not api_key:
+            raise RuntimeError("missing SILICONFLOW_API_KEY")
+        return _request_siliconflow_text_polish(api_key, paper, raw_texts)
+    raise RuntimeError(f"unsupported text polish provider: {provider}")
+
+
+def _text_polish_provider_name(provider: str) -> str:
+    if provider == "siliconflow":
+        return "SiliconFlow"
+    if provider == "gemini":
+        return "Gemini"
+    return provider
+
+
+def _text_polish_provider_reason(provider: str) -> str:
+    if provider == "siliconflow":
+        return f"SiliconFlow text model: {_siliconflow_text_model()}"
+    if provider == "gemini":
+        return f"Gemini text model: {_gemini_text_model()}"
+    return f"text model provider: {provider}"
+
+
+def _clean_text_polish_payload(polished: dict[str, str], raw_texts: dict[str, str]) -> dict[str, str]:
+    return {
         key: _clean_polished_text(value)
         for key, value in polished.items()
         if key in raw_texts and isinstance(value, str) and _clean_polished_text(value)
     }
-    if not cleaned:
-        return TextPolishResult("fallback", "Gemini text polish returned no usable text")
-    return TextPolishResult("api", f"Gemini text model: {_gemini_text_model()}", cleaned)
 
 
 def _text_polish_inputs(paper: dict[str, Any], reading: PaperReading, figures: list[DeepDiveFigure]) -> dict[str, str]:
@@ -2126,18 +2183,7 @@ def _request_gemini_text_polish(api_key: str, paper: dict[str, Any], texts: dict
         + ":generateContent?key="
         + urllib.parse.quote(api_key, safe="")
     )
-    prompt = (
-        "你是中文科技公众号编辑。请润色下面这组论文解读文案，只提升自然度、顺滑度和可读性，"
-        "不要新增事实，不要删除关键风险机制、方法机制、实验机制，不要加入“AI”“自动生成”“邮件指定”等表述。"
-        "避免使用“通常”“一般”“线索落在”“数字线索”“短句线索”“原文强调的是”“可以重点看”这类模板化句式。"
-        "chapter:*:point:* 的文本如果开头带“标签：”，必须保留这个标签和冒号，只润色冒号后面的解释。"
-        "如果原文里出现疑似 PDF/OCR 残片、孤立数字或不完整短语，不要硬解释，改成更自然的概括。"
-        "遇到图组说明时保留“这一组图”或“这一组”的表达，不要改成“这张图”。"
-        "保持每个 key 对应一段中文文本，保留英文专有名词和单位。只返回 JSON 对象，键名必须与输入一致。\n\n"
-        f"论文题目：{_display_title(paper)}\n"
-        "待润色 JSON：\n"
-        + json.dumps(texts, ensure_ascii=False, indent=2)
-    )
+    prompt = _text_polish_prompt(paper, texts)
     body = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
@@ -2166,8 +2212,72 @@ def _request_gemini_text_polish(api_key: str, paper: dict[str, Any], texts: dict
     return {str(key): str(value) for key, value in data.items()}
 
 
+def _request_siliconflow_text_polish(api_key: str, paper: dict[str, Any], texts: dict[str, str]) -> dict[str, str]:
+    endpoint = os.getenv("SILICONFLOW_TEXT_ENDPOINT", "https://api.siliconflow.cn/v1/chat/completions")
+    aliases = {f"k{index:03d}": key for index, key in enumerate(texts, start=1)}
+    alias_texts = {alias: texts[key] for alias, key in aliases.items()}
+    body: dict[str, Any] = {
+        "model": _siliconflow_text_model(),
+        "messages": [
+            {
+                "role": "system",
+                "content": "你是中文科技公众号编辑，只返回合法 JSON 对象。",
+            },
+            {
+                "role": "user",
+                "content": _text_polish_prompt(paper, alias_texts),
+            },
+        ],
+        "temperature": float(os.getenv("SILICONFLOW_TEXT_TEMPERATURE", os.getenv("GEMINI_TEXT_TEMPERATURE", "0.35"))),
+        "max_tokens": int(os.getenv("SILICONFLOW_TEXT_MAX_TOKENS", "8192")),
+    }
+    if os.getenv("SILICONFLOW_TEXT_RESPONSE_FORMAT", "0").lower() in {"1", "true", "yes", "on"}:
+        body["response_format"] = {"type": "json_object"}
+    request = urllib.request.Request(
+        endpoint,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=float(os.getenv("SILICONFLOW_TEXT_TIMEOUT_SECONDS", "180"))) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"SiliconFlow text API HTTP {exc.code}: {detail}") from exc
+    text = _extract_openai_message_text(payload)
+    if not text:
+        raise RuntimeError("SiliconFlow text API response did not include message content")
+    data = json.loads(_extract_json_object(text))
+    if not isinstance(data, dict):
+        raise RuntimeError("SiliconFlow text polish response was not a JSON object")
+    return {
+        aliases.get(str(key), str(key)): str(value)
+        for key, value in data.items()
+    }
+
+
 def _gemini_text_model() -> str:
     return os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
+
+
+def _siliconflow_text_model() -> str:
+    return os.getenv("SILICONFLOW_TEXT_MODEL", "deepseek-ai/DeepSeek-V3").strip() or "deepseek-ai/DeepSeek-V3"
+
+
+def _text_polish_prompt(paper: dict[str, Any], texts: dict[str, str]) -> str:
+    return (
+        "你是中文科技公众号编辑。请润色下面这组论文解读文案，只提升自然度、顺滑度和可读性，"
+        "不要新增事实，不要删除关键风险机制、方法机制、实验机制，不要加入“AI”“自动生成”“邮件指定”等表述。"
+        "避免使用“通常”“一般”“线索落在”“数字线索”“短句线索”“原文强调的是”“可以重点看”这类模板化句式。"
+        "chapter:*:point:* 的文本如果开头带“标签：”，必须保留这个标签和冒号，只润色冒号后面的解释。"
+        "如果原文里出现疑似 PDF/OCR 残片、孤立数字或不完整短语，不要硬解释，改成更自然的概括。"
+        "遇到图组说明时保留“这一组图”或“这一组”的表达，不要改成“这张图”。"
+        "保持每个 key 对应一段中文文本，保留英文专有名词和单位。只返回 JSON 对象，键名必须与输入一致。\n\n"
+        f"论文题目：{_display_title(paper)}\n"
+        "待润色 JSON：\n"
+        + json.dumps(texts, ensure_ascii=False, indent=2)
+    )
 
 
 def _extract_gemini_text(payload: Any) -> str:
@@ -2188,6 +2298,27 @@ def _extract_gemini_text(payload: Any) -> str:
         text = payload.get("text")
         if isinstance(text, str):
             return text.strip()
+    return ""
+
+
+def _extract_openai_message_text(payload: Any) -> str:
+    if isinstance(payload, dict):
+        choices = payload.get("choices")
+        if isinstance(choices, list):
+            for choice in choices:
+                if not isinstance(choice, dict):
+                    continue
+                message = choice.get("message")
+                if isinstance(message, dict):
+                    content = message.get("content")
+                    if isinstance(content, str) and content.strip():
+                        return content.strip()
+                text = choice.get("text")
+                if isinstance(text, str) and text.strip():
+                    return text.strip()
+        output = payload.get("output")
+        if isinstance(output, str):
+            return output.strip()
     return ""
 
 
