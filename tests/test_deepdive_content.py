@@ -15,6 +15,9 @@ from daily_gnss_slam_digest.deepdive import (
     _content_mode_label,
     _display_figure_caption,
     _draft_source_lines,
+    _detail_tokens,
+    _domain_profile,
+    _evidence_summary,
     _extract_base64_image,
     _figure_reading,
     _figure_section,
@@ -24,6 +27,9 @@ from daily_gnss_slam_digest.deepdive import (
     _is_low_information_image,
     _parse_caption_anchors,
     _prepare_article_figures,
+    _sentence_candidates,
+    _usable_detail_tokens,
+    _usable_numbers,
     build_deepdive_html,
     build_deepdive_markdown,
 )
@@ -80,6 +86,43 @@ class DeepDiveContentTest(unittest.TestCase):
             self.assertNotIn("线索落在", text)
             self.assertNotIn("数字线索", text)
             self.assertNotIn("短句线索", text)
+            self.assertNotIn("可以重点看", text)
+            self.assertNotIn("原文强调的是", text)
+            self.assertNotIn("相关数字包括", text)
+            self.assertNotIn("文中围绕", text)
+            self.assertNotIn("文中给出了", text)
+
+    def test_deepdive_filters_pdf_fragments_and_fake_terms(self) -> None:
+        noisy_text = (
+            "8,. 5,. These paragraphs mention Command Measured Entry, ISUAL, NFO, IDAR, ORM, and GPS-referenced Yas-region. "
+            "The evaluation uses GNSS and UAV measurements across four scenarios at 10 m/s and 80 m. "
+            "The result table reports localization error and recovery time."
+        )
+
+        self.assertNotIn("8,.", _sentence_candidates(noisy_text))
+        self.assertNotIn("5,.", _sentence_candidates(noisy_text))
+        self.assertNotIn("These", _detail_tokens(noisy_text))
+        self.assertNotIn("Command Measured Entry", _detail_tokens(noisy_text))
+        self.assertNotIn("GPS-referenced Yas-region", _detail_tokens(noisy_text))
+        for fake_term in ("ISUAL", "NFO", "IDAR", "ORM"):
+            self.assertNotIn(fake_term, _usable_detail_tokens(_detail_tokens(noisy_text)))
+        self.assertNotIn("原文强调的是", _evidence_summary("8,."))
+        self.assertEqual(_evidence_summary("8,."), "")
+        self.assertEqual(_evidence_summary("This short line only mentions HILTI."), "")
+        self.assertEqual(_evidence_summary("The model reports a 10s interval."), "")
+        self.assertNotIn("4032 x", _usable_numbers(["4032 x", "10 m/s"]))
+        self.assertIn("10 m/s", _usable_numbers(["4032 x", "10 m/s"]))
+
+    def test_slam_papers_with_gps_reference_are_not_classified_as_gnss_security(self) -> None:
+        paper = {
+            "title": "FAST-LIVO trajectories with GPS reference",
+            "abstract": "This SLAM paper evaluates LiDAR visual inertial odometry with GPS ground truth trajectories.",
+            "matched_terms": ["slam", "lidar", "odometry"],
+        }
+        profile = _domain_profile(paper, PaperReading("", "", "", "", "", ()))
+
+        self.assertNotIn("GNSS/PNT", profile["actor"])
+        self.assertTrue("SLAM" in profile["engineering"] or "LIVO" in profile["engineering"])
 
     def test_ai_figure_is_labeled_as_auxiliary_illustration(self) -> None:
         paper = {

@@ -418,7 +418,7 @@ def build_deepdive_markdown(
         "",
     ]
     for index, (role, chapter) in enumerate(zip(PAPER_CHAPTER_ROLES, chapters), start=1):
-        lines.extend(_chapter_markdown_one(chapter, role, index))
+        lines.extend(_chapter_markdown_one(chapter, role, index, text_polish))
         figure = figure_by_section.get(role)
         if figure:
             lines.extend(
@@ -489,7 +489,7 @@ def build_deepdive_html(
     )
 
     for index, (role, chapter) in enumerate(zip(PAPER_CHAPTER_ROLES, chapters), start=1):
-        parts.append(_chapter_card_one(chapter, role, index))
+        parts.append(_chapter_card_one(chapter, role, index, text_polish))
         figure = figure_by_section.get(role)
         if figure:
             parts.append(
@@ -589,31 +589,56 @@ def _figure_html_block(
     )
 
 
-def _chapter_markdown_one(chapter: tuple[str, str, tuple[str, ...]], role: str, index: int) -> list[str]:
+def _chapter_markdown_one(
+    chapter: tuple[str, str, tuple[str, ...]],
+    role: str,
+    index: int,
+    text_polish: TextPolishResult | None,
+) -> list[str]:
     title, body, points = chapter
-    lines = [f"### {index}. {_paper_chapter_title(role, title)}", "", body, ""]
+    lines = [
+        f"### {index}. {_paper_chapter_title(role, title)}",
+        "",
+        _polished_text(text_polish, _chapter_text_key(role, "body"), body),
+        "",
+    ]
     if points:
-        lines.extend([*_markdown_bullets(list(points)), ""])
+        polished_points = [
+            _polished_text(text_polish, _chapter_text_key(role, f"point:{point_index}"), point)
+            for point_index, point in enumerate(points, start=1)
+        ]
+        lines.extend([*_markdown_bullets(polished_points), ""])
     return lines
 
 
-def _chapter_card_one(chapter: tuple[str, str, tuple[str, ...]], role: str, index: int) -> str:
+def _chapter_card_one(
+    chapter: tuple[str, str, tuple[str, ...]],
+    role: str,
+    index: int,
+    text_polish: TextPolishResult | None,
+) -> str:
     title, body, points = chapter
     point_html = ""
     if points:
         point_html = "".join(
             f'<p style="margin:8px 0 0;color:#40545c;font-size:14px;line-height:1.8;">'
-            f'<strong style="color:#0b9984;">{point_index}.</strong> {html.escape(point)}</p>'
+            f'<strong style="color:#0b9984;">{point_index}.</strong> '
+            f'{html.escape(_polished_text(text_polish, _chapter_text_key(role, f"point:{point_index}"), point))}</p>'
             for point_index, point in enumerate(points, start=1)
         )
     return (
         '<section style="margin:0 0 12px;padding:14px 15px;background:#f7fbfb;'
         'border:1px solid #e0eeee;border-radius:8px;">'
         f'<p style="margin:0 0 8px;color:#0b9984;font-size:14px;font-weight:800;">{index}. {html.escape(_paper_chapter_title(role, title))}</p>'
-        f'<p style="margin:0;color:#40545c;font-size:14px;line-height:1.9;">{html.escape(body)}</p>'
+        f'<p style="margin:0;color:#40545c;font-size:14px;line-height:1.9;">'
+        f'{html.escape(_polished_text(text_polish, _chapter_text_key(role, "body"), body))}</p>'
         f"{point_html}"
         "</section>"
     )
+
+
+def _chapter_text_key(role: str, suffix: str) -> str:
+    return f"chapter:{role}:{suffix}"
 
 
 def _paper_chapter_title(role: str, fallback: str) -> str:
@@ -2083,6 +2108,11 @@ def _text_polish_inputs(paper: dict[str, Any], reading: PaperReading, figures: l
         "one_sentence": _one_sentence(paper, reading),
         "story_intro": _story_intro(paper, reading),
     }
+    for role, chapter in zip(PAPER_CHAPTER_ROLES, _chapter_walkthrough(paper, reading)):
+        _title, body, points = chapter
+        texts[_chapter_text_key(role, "body")] = body
+        for point_index, point in enumerate(points, start=1):
+            texts[_chapter_text_key(role, f"point:{point_index}")] = point
     for index, figure in enumerate(figures, start=1):
         texts[f"figure:{figure.path.name}"] = _figure_reading(paper, reading, figure, index)
     return texts
@@ -2099,7 +2129,9 @@ def _request_gemini_text_polish(api_key: str, paper: dict[str, Any], texts: dict
     prompt = (
         "你是中文科技公众号编辑。请润色下面这组论文解读文案，只提升自然度、顺滑度和可读性，"
         "不要新增事实，不要删除关键风险机制、方法机制、实验机制，不要加入“AI”“自动生成”“邮件指定”等表述。"
-        "避免使用“通常”“一般”“线索落在”“数字线索”“短句线索”这类模板化句式。"
+        "避免使用“通常”“一般”“线索落在”“数字线索”“短句线索”“原文强调的是”“可以重点看”这类模板化句式。"
+        "chapter:*:point:* 的文本如果开头带“标签：”，必须保留这个标签和冒号，只润色冒号后面的解释。"
+        "如果原文里出现疑似 PDF/OCR 残片、孤立数字或不完整短语，不要硬解释，改成更自然的概括。"
         "遇到图组说明时保留“这一组图”或“这一组”的表达，不要改成“这张图”。"
         "保持每个 key 对应一段中文文本，保留英文专有名词和单位。只返回 JSON 对象，键名必须与输入一致。\n\n"
         f"论文题目：{_display_title(paper)}\n"
@@ -2222,27 +2254,26 @@ def _one_sentence(paper: dict[str, Any], reading: PaperReading | None = None) ->
     profile = _domain_profile(paper, reading)
     facts = _paper_facts(paper, reading)
     claim = facts.get("method") or facts.get("finding") or facts.get("problem")
+    evidence = _evidence_summary(claim or "")
+    tail = f"；{evidence}" if evidence else ""
     if claim:
         return (
-            f"这篇论文围绕{profile['actor']}遇到的“{profile['problem']}”展开，"
-            f"核心看点是{_claim_to_plain_chinese(claim, profile, 'method')}。"
+            f"这篇论文要解决的是{profile['actor']}在{profile['scene']}里遇到的“{profile['problem']}”，"
+            f"读法上可以盯住{profile['method']}如何从输入走到可落地的{profile['engineering']}{tail}。"
         )
     return f"这篇论文值得按“{profile['problem']} -> {profile['method']} -> {profile['experiment']}”这条线读。"
 
 
 def _story_intro(paper: dict[str, Any], reading: PaperReading) -> str:
     profile = _domain_profile(paper, reading)
-    facts = _paper_facts(paper, reading)
     title = _display_title(paper)
-    opening = _claim_to_plain_chinese(facts.get("problem", ""), profile, "problem")
-    method = _claim_to_plain_chinese(facts.get("method", ""), profile, "method")
-    experiment = _claim_to_plain_chinese(facts.get("experiment", ""), profile, "experiment")
-    ending = _claim_to_plain_chinese(facts.get("finding", ""), profile, "finding")
+    terms = _paper_terms(paper, reading)[:3]
+    term_text = f"题目里的 {_join_readable(terms)} 已经把范围圈出来。" if terms else ""
     return (
-        f"读《{title}》时，可以先把主角放在{profile['scene']}里："
-        f"{opening}。作者接着把镜头推到做法上，重点是{method}。"
-        f"到了实验部分，证据会落在{experiment}。最后再回到工程问题：{ending}。"
-        f"这样读下来，论文就不是一堆模块名，而是一条从风险、动作、证据到落地边界的线。"
+        f"读《{title}》时，可以先把它当成一个工程故事：系统在{profile['scene']}里工作，"
+        f"但{profile['problem']}，原本稳定的输入链路就会被打乱。{term_text}"
+        f"接着看作者怎样用{profile['method']}把问题拆开，再看实验是否真的覆盖{profile['experiment']}。"
+        f"最后回到自己的平台，判断它能不能接进{profile['engineering']}。"
     )
 
 
@@ -2325,28 +2356,29 @@ def _chapter_cards(chapters: list[tuple[str, str, tuple[str, ...]]], start: int 
 
 def _section_narrative(section_text: str, profile: dict[str, str], role: str, fallback_claim: str = "") -> str:
     claim = fallback_claim or _pick_sentence(section_text, _role_terms(profile, role), role)
-    anchor = _claim_to_plain_chinese(claim, profile, role)
+    evidence = _evidence_summary(claim)
+    evidence_sentence = f"{evidence}。" if evidence else ""
     if role == "problem":
         return (
-            f"开篇先把矛盾摆出来：{profile['actor']}原本依赖稳定输入工作，"
-            f"但现场会遇到{profile['problem']}。{anchor}。"
+            f"开篇先回答为什么这个问题值得做：{profile['actor']}原本依赖稳定输入工作，"
+            f"但现场会出现这样的麻烦：{profile['problem']}。{evidence_sentence}"
             "读这一段时，不必急着记术语，先看清作者认为“危险”到底发生在哪个环节。"
         )
     if role == "method":
         return (
-            f"方法部分可以当作一条处理链来看：输入是什么，{profile['method']}怎样把信息组织起来，"
-            f"最后又怎样服务于{profile['engineering']}。{anchor}。"
+            f"方法部分可以当作一条处理链来看：输入是什么，{profile['method']}怎样组织信息，"
+            f"最后又怎样服务于{profile['engineering']}。{evidence_sentence}"
             "这样读会比逐个背模块名轻松，也更容易看出作者真正改动了哪里。"
         )
     if role == "experiment":
         return (
             f"实验部分重点看证据链是否完整：数据从哪里来，场景够不够真实，指标是否能说明问题。"
-            f"这篇会围绕{profile['experiment']}展开验证。{anchor}。"
+            f"这篇主要用{profile['experiment']}验证。{evidence_sentence}"
             "如果图表里能同时看到成功样例和困难样例，结论就更有参考价值。"
         )
     return (
         f"最后再看边界：作者证明了什么，哪些条件下成立，换到自己的平台是否还需要重做标定或实验。"
-        f"对工程读者来说，关键是它能否接到{profile['engineering']}。{anchor}。"
+        f"对工程读者来说，关键是它能否接到{profile['engineering']}。{evidence_sentence}"
     )
 
 
@@ -2397,6 +2429,17 @@ def _followup_questions(paper: dict[str, Any]) -> list[str]:
     profile = _domain_profile(paper, reading)
     terms = _paper_terms(paper, reading)
     first_term = terms[0] if terms else profile["actor"]
+    if first_term.lower() in {
+        "robust",
+        "odometry",
+        "localization",
+        "mapping",
+        "navigation",
+        "fusion",
+        "dataset",
+        "benchmark",
+    }:
+        first_term = profile["actor"]
     return [
         f"如果把 {first_term} 换到自己的机器人或车辆平台，最先需要重新标定的是输入数据、阈值，还是传感器外参？",
         f"论文里的证据是否覆盖了{profile['scene']}里最容易失败的场景，还是只证明了一个受控设置？",
@@ -2484,25 +2527,72 @@ def _figure_reading(paper: dict[str, Any], reading: PaperReading, figure: DeepDi
 def _domain_profile(paper: dict[str, Any], reading: PaperReading) -> dict[str, str]:
     text = _combined_text(paper, reading).lower()
     terms = set(str(term).lower() for term in paper.get("matched_terms", []))
-    if terms & {"spoofing", "jamming", "interference", "integrity", "pnt"} or any(
-        token in text for token in ("gnss", "gps", "spoof", "jamming", "interference", "pnt", "timing protection")
-    ):
+    gnss_security = terms & {"spoofing", "jamming", "interference", "integrity", "pnt"} or any(
+        token in text for token in ("spoof", "jamming", "interference", "pnt", "timing protection", "protection level", "osnma")
+    )
+    slam_or_robotics = any(
+        token in text
+        for token in (
+            "slam",
+            "odometry",
+            "mapping",
+            "lidar",
+            "imu",
+            "visual",
+            "camera",
+            "3dgs",
+            "gaussian",
+            "livo",
+            "lio",
+            "vio",
+        )
+    )
+    if gnss_security and not slam_or_robotics:
         return {
             "actor": "GNSS/PNT 接收机以及依赖它的车辆、机器人或授时系统",
             "scene": "开放环境里的定位、导航和授时链路",
-            "problem": "外部信号可能被伪造、压制或缓慢拉偏，系统却还会输出看似可信的位置或时间",
+            "problem": "外部信号被伪造、压制或缓慢拉偏时，系统仍可能输出看似可信的位置或时间",
             "method": "接收机观测、攻击构造、检测统计量、保护级或轻量模型",
             "experiment": "真实设备、回放信号、公开攻击数据、误报漏报、时间误差或部署算力",
             "engineering": "GNSS 可信度评估、融合定位降权、告警策略和完整性监测",
         }
-    if any(token in text for token in ("slam", "odometry", "mapping", "lidar", "imu", "visual", "camera", "3dgs", "gaussian")):
+    if slam_or_robotics and "uav" in text and "gps-denied" in text:
+        return {
+            "actor": "GPS-denied 无人机定位系统",
+            "scene": "没有稳定 GNSS 的无人机巡检、测绘和跨时段重定位场景",
+            "problem": "GNSS 不可用、跨时段外观变化和视角差异会削弱地图匹配与位姿约束",
+            "method": "3D LiDAR、相机观测、跨 session 地图匹配、特征关联和位姿估计",
+            "experiment": "跨时段定位误差、匹配成功率、地图变化、飞行平台验证和失败样例",
+            "engineering": "无人机重定位、离线地图复用、传感器同步和无 GNSS 飞行安全",
+        }
+    if slam_or_robotics and any(token in text for token in ("lidar-inertial-visual", "visual-inertial", "lidar-inertial", "livo")):
+        return {
+            "actor": "LiDAR-IMU-相机融合里程计与建图系统",
+            "scene": "室内外移动机器人、自动驾驶和大尺度三维建图场景",
+            "problem": "遮挡、弱纹理、几何退化或高速运动会让单一观测源失去稳定约束",
+            "method": "LiDAR、IMU 与相机紧耦合融合、退化方向识别、状态更新和体素地图维护",
+            "experiment": "轨迹误差、地图质量、退化场景、实时频率和公开数据集对比",
+            "engineering": "LIVO 前端/后端、地图更新、退化处理和车载/机器人实时部署",
+        }
+    if slam_or_robotics:
         return {
             "actor": "移动机器人定位与建图系统",
             "scene": "室内外移动机器人、自动驾驶或大尺度建图场景",
-            "problem": "单一传感器会在遮挡、稀疏几何、动态物体或长距离运行中失去稳定约束",
+            "problem": "遮挡、稀疏几何、动态物体或长距离运行会削弱单一传感器约束",
             "method": "传感器融合、几何约束、地图表达、回环检测或学习式前端",
             "experiment": "轨迹误差、地图一致性、传感器退化、跨数据集对比和实时性",
             "engineering": "SLAM 前端/后端、地图维护、传感器降级和部署算力预算",
+        }
+    if gnss_security or any(
+        token in text for token in ("gnss", "gps")
+    ):
+        return {
+            "actor": "GNSS/PNT 接收机以及依赖它的车辆、机器人或授时系统",
+            "scene": "开放环境里的定位、导航和授时链路",
+            "problem": "外部信号被伪造、压制或缓慢拉偏时，系统仍可能输出看似可信的位置或时间",
+            "method": "接收机观测、攻击构造、检测统计量、保护级或轻量模型",
+            "experiment": "真实设备、回放信号、公开攻击数据、误报漏报、时间误差或部署算力",
+            "engineering": "GNSS 可信度评估、融合定位降权、告警策略和完整性监测",
         }
     if any(token in text for token in ("navigation", "planning", "embodied", "language", "policy", "manipulation")):
         return {
@@ -2566,9 +2656,11 @@ def _claim_to_plain_chinese(claim: str, profile: dict[str, str], role: str) -> s
 
 def _point_from_claim(label: str, claim: str, profile: dict[str, str], role: str) -> str:
     evidence = _evidence_summary(claim)
+    if not evidence:
+        return _fallback_point(profile, role, label, claim)
     if role == "problem":
         if label == "场景压力":
-            return f"{evidence}，说明论文把问题放在{profile['scene']}里看，定位结果会继续影响后续通信、控制或授时"
+            return f"{evidence}，说明论文不是孤立讨论算法，而是把问题放回{profile['scene']}里看"
         if label == "失效来源":
             return f"{evidence}，危险点在于输入被污染后，{profile['actor']}仍可能给出像正常一样的输出"
         if label == "作者抓住的变量":
@@ -2576,11 +2668,11 @@ def _point_from_claim(label: str, claim: str, profile: dict[str, str], role: str
         return f"{evidence}，影响会从单个观测扩散到{profile['engineering']}"
     if role == "method":
         if label == "输入/观测":
-            return f"{evidence}，先确认这些输入是实测、回放、仿真，还是由模型生成"
+            return f"{evidence}，读这一项时先确认输入来自实测、回放、仿真，还是由模型生成"
         if label == "核心步骤":
             return f"{evidence}，把这些步骤按时间顺序串起来，就是论文的主处理链"
         if label == "模型或检测量":
-            return f"{evidence}，读到这里要分清哪些是可测变量，哪些是作者构造出的判断量"
+            return f"{evidence}，这里要分清哪些量直接来自传感器，哪些量是作者为了判断风险或约束状态而构造出来的"
         if label == "输出形式":
             return f"{evidence}，输出必须能被后续模块消费，才有机会接入{profile['engineering']}"
         return f"{evidence}，工程接入时要明确它改变告警、权重、地图还是控制决策"
@@ -2604,44 +2696,111 @@ def _point_from_claim(label: str, claim: str, profile: dict[str, str], role: str
 
 
 def _fallback_point(profile: dict[str, str], role: str, label: str, source: str = "") -> str:
-    details = _detail_tokens(source)
-    numbers = _numbers_and_units(source)
+    details = _usable_detail_tokens(_detail_tokens(source))
+    numbers = _usable_numbers(_numbers_and_units(source))
     if role == "problem":
-        if details:
-            return f"围绕 {', '.join(details[:4])}，把{profile['problem']}拆成可观察的输入变化"
-        return f"围绕{profile['actor']}，把{profile['problem']}拆成可观察的输入变化"
+        if len(details) >= 2:
+            return f"把{_join_readable(details[:3])}放到同一个场景里看，核心是定位{profile['problem']}最先出现在哪个环节"
+        if label == "场景压力":
+            return f"先看论文把{profile['actor']}放进什么场景，开阔、遮挡、长距离或弱纹理环境都会改变系统可靠性"
+        if label == "失效来源":
+            return f"重点找输入在哪一步开始变坏：可能是观测退化、同步误差、动态干扰，也可能是外部信号被伪造或压制"
+        if label == "作者抓住的变量":
+            return "注意作者选了哪些可观测量来描述风险，例如残差、协方差、地图一致性、保护级、置信度或状态漂移"
+        return f"影响不会只停在单个传感器，最后会传到{profile['engineering']}，这也是论文值得读的工程原因"
     if role == "method":
-        if label == "核心步骤" and details:
-            return f"把 {', '.join(details[:5])} 串成流程，确认每一步的输入和输出"
-        if label == "模型或检测量" and details:
-            return f"重点跟踪 {', '.join(details[:5])}，看它们是观测量、模型模块还是实验设备"
+        if label == "输入/观测":
+            if len(details) >= 2:
+                return f"先把{_join_readable(details[:3])}分成传感器输入、平台或中间状态，后面的公式才容易跟上"
+            return "先把传感器输入、时间同步和状态变量分清楚，后面再看各模块怎样传递信息"
+        if label == "核心步骤" and len(details) >= 2:
+            return f"把{_join_readable(details[:4])}按处理顺序串起来，确认每一步吃什么输入、吐出什么中间量"
+        if label == "模型或检测量":
+            if len(details) >= 2:
+                return f"把{_join_readable(details[:4])}放回处理链里看，判断它们分别是观测量、模型模块还是实验设备"
+            if len(numbers) >= 2:
+                return f"把{_join_readable(numbers[:3])}对应到频率、误差、速度或算力上，避免把单个数字误读成结论"
+            return "先分清直接观测、人工构造的约束量和最终优化目标，很多论文的创新就藏在这三者的连接方式里"
         if label == "输出形式":
             return f"输出要能回到{profile['engineering']}，否则方法只停留在离线演示"
         if label == "接入方式":
             return f"把结果接到{profile['engineering']}时，要明确它改变的是告警、权重、地图还是控制决策"
         return f"检查{profile['method']}分别消耗什么输入、产生什么中间量、怎样输出给后续模块"
     if role == "experiment":
-        if numbers:
-            return f"先看 {', '.join(numbers[:5])} 这些数字对应场景强度、速度、误差还是算力"
-        if details:
-            return f"围绕 {', '.join(details[:5])} 复核数据来源、测试平台和对比对象"
-        return f"把{profile['experiment']}和论文声称要解决的问题逐项对齐"
-    if details:
-        return f"把 {', '.join(details[:4])} 放回{profile['engineering']}，判断它是否能进入自己的系统"
-    return f"把{label}落回{profile['engineering']}，判断它是否能进入自己的系统"
+        if label == "数据来源":
+            if len(details) >= 2:
+                return f"用{_join_readable(details[:3])}对照数据来源，重点确认真实采集、公开数据集和仿真各占多少"
+            return "先确认数据来自真实设备、公开数据集还是仿真环境，再看是否覆盖论文声称的应用场景"
+        if label == "实验场景":
+            return f"把测试场景和{profile['scene']}对齐，看是否覆盖开阔、遮挡、长距离或传感器退化等困难条件"
+        if label == "对比指标":
+            if len(numbers) >= 2:
+                return f"把{_join_readable(numbers[:3])}对应到误差、速度、距离或算力上，确认指标是否真的支撑结论"
+            return f"先看指标是否直接衡量{profile['problem']}，再看它和对比方法是否公平"
+        if label == "结果读法":
+            return "重点不是单个结果好看，而是成功样例、困难样例和失败样例能不能共同解释作者的结论"
+        if label == "失败边界":
+            return "留意作者没有覆盖的场景：传感器失效、同步误差、动态物体、远距离运行或算力限制都可能改变结论"
+        if len(numbers) >= 2:
+            return f"先把{_join_readable(numbers[:4])}这些数字对应到场景强度、速度、误差或算力，不要只看单个数值大小"
+        if len(details) >= 2:
+            return f"围绕{_join_readable(details[:4])}复核数据来源、测试平台和对比对象"
+        return f"把论文声称要解决的问题，和{profile['experiment']}逐项对齐"
+    if len(details) >= 2:
+        return f"结合{_join_readable(details[:3])}看结论边界，判断它是否真的能进入{profile['engineering']}"
+    if label == "主要贡献":
+        return "先用一句话归纳作者到底解决了什么：是提高鲁棒性、降低算力、扩展传感器组合，还是给出更清楚的风险边界"
+    if label == "适用条件":
+        return "看清楚成立条件：传感器配置、同步精度、场景覆盖、数据规模和算力预算一变，结论可能也会变"
+    if label == "工程收益":
+        return f"把收益翻译成系统语言：它能否减少误信、漂移、漏检、重建破碎或{profile['engineering']}里的计算开销"
+    return "复现前先检查数据、参数、同步、评价脚本和失败样例；这些比单看平均指标更能暴露方法边界"
 
 
 def _evidence_summary(claim: str) -> str:
-    details = _detail_tokens(claim)
-    numbers = _numbers_and_units(claim)
-    if details and numbers:
-        return f"可以重点看 {', '.join(details[:4])}，同时留意 {', '.join(numbers[:4])} 这些数字"
-    if details:
-        return f"可以重点看 {', '.join(details[:5])}"
-    if numbers:
-        return f"相关数字包括 {', '.join(numbers[:5])}"
-    phrase = _short_evidence(claim, max_words=16)
-    return f"原文强调的是 {phrase}" if phrase else "这一段给出的证据需要回到原文细读"
+    details = _usable_detail_tokens(_detail_tokens(claim))
+    numbers = _usable_numbers(_numbers_and_units(claim))
+    if details and len(numbers) >= 2:
+        return f"这里提到{_join_readable(details[:3])}，同时给出{_join_readable(numbers[:3])}这类运行条件"
+    if len(details) >= 2 and numbers:
+        return f"这里提到{_join_readable(details[:3])}，并给出一个量化条件来说明具体设置"
+    if len(details) >= 3:
+        return f"这里串起{_join_readable(details[:4])}，适合用来定位系统组成或实验对象"
+    if len(numbers) >= 2:
+        return f"这里给出{_join_readable(numbers[:4])}这类量化条件，后面要看它们对应误差、速度还是算力"
+    phrase = _safe_evidence_phrase(claim)
+    return f"这一段的重点是{phrase}" if phrase else ""
+
+
+def _join_readable(items: list[str] | tuple[str, ...]) -> str:
+    clean = [item.strip() for item in items if item and item.strip()]
+    if not clean:
+        return ""
+    if len(clean) == 1:
+        return clean[0]
+    if len(clean) == 2:
+        return f"{clean[0]}和{clean[1]}"
+    return "、".join(clean[:-1]) + f"和{clean[-1]}"
+
+
+def _safe_evidence_phrase(text: str) -> str:
+    phrase = _short_evidence(text, max_words=18, max_chars=118)
+    if not _is_meaningful_evidence_text(phrase):
+        return ""
+    if not re.search(r"[\u4e00-\u9fff]", phrase):
+        return ""
+    return phrase
+
+
+def _is_meaningful_evidence_text(text: str) -> bool:
+    text = _clean_text(text).strip(" ,.;:，。；：")
+    if not text:
+        return False
+    if re.fullmatch(r"[\d\s,.;:()\[\]{}+\-/%]+", text):
+        return False
+    if len(text) < 28 and len(re.findall(r"[A-Za-z]{3,}|[\u4e00-\u9fff]", text)) < 4:
+        return False
+    return True
 
 
 def _abstract_text(paper: dict[str, Any], reading: PaperReading) -> str:
@@ -2757,6 +2916,9 @@ def _canonical_term(term: str) -> str:
         "sdr": "SDR",
         "v2x": "V2X",
         "3dgs": "3DGS",
+        "ubspace aware": "Subspace-Aware",
+        "subspace aware": "Subspace-Aware",
+        "subspace-aware": "Subspace-Aware",
     }
     return mapping.get(term.lower(), term)
 
@@ -2820,6 +2982,8 @@ def _sentence_candidates(text: str) -> list[str]:
         sentence = piece.strip(" -")
         if not sentence:
             continue
+        if not _is_meaningful_evidence_text(sentence):
+            continue
         if len(sentence) < 45 and not re.search(r"\d", sentence):
             continue
         if len(sentence) > 420:
@@ -2851,7 +3015,8 @@ def _short_evidence(text: str, max_words: int = 22, max_chars: int = 132) -> str
 
 def _numbers_and_units(text: str) -> list[str]:
     patterns = (
-        r"\b\d+(?:\.\d+)?\s?(?:km/h|m/s|ms|ns|s|dB|Hz|kHz|MHz|GHz|m|km|%|x)\b",
+        r"\b\d+(?:\.\d+)?\s?(?:km/h|m/s|ms|ns|s|dB|Hz|kHz|MHz|GHz|m|km|%)\b",
+        r"\b\d+(?:\.\d+)?x\b",
         r"\b\d+/\d+\b",
         r"\b\d+(?:\.\d+)?\s?(?:pages|figures|tables|scenarios|devices)\b",
     )
@@ -2861,11 +3026,24 @@ def _numbers_and_units(text: str) -> list[str]:
     return list(dict.fromkeys(values))
 
 
+def _usable_numbers(numbers: list[str]) -> list[str]:
+    usable: list[str] = []
+    for number in numbers:
+        clean = number.strip()
+        if re.match(r"^\d{3,}\s*x$", clean, re.IGNORECASE):
+            continue
+        if clean.lower().endswith("x") and not re.match(r"^\d+(?:\.\d+)?x$", clean, re.IGNORECASE):
+            continue
+        usable.append(clean)
+    return list(dict.fromkeys(usable))
+
+
 def _detail_tokens(text: str) -> list[str]:
     tokens = _paper_terms_from_text(text)
     tokens.extend(
         match.group(0).strip()
         for match in re.finditer(r"\b[A-Z][A-Za-z0-9/+.-]{2,}(?:\s+[A-Z][A-Za-z0-9/+.-]{2,}){0,2}\b", text)
+        if _looks_like_technical_name(match.group(0))
     )
     for phrase in (
         "Haversine distance",
@@ -2889,6 +3067,7 @@ def _detail_tokens(text: str) -> list[str]:
         "under",
         "within",
         "both",
+        "these",
         "first",
         "second",
         "third",
@@ -2899,17 +3078,103 @@ def _detail_tokens(text: str) -> list[str]:
         "and future work the",
         "controlled testbench",
         "common attack pattern",
+        "command measured entry",
+        "gps-referenced yas-region",
+        "yas-region",
     }
     for token in tokens:
         token = token.strip(" ,.;:()[]")
         token = re.sub(r"\s+", " ", token)
         token = re.sub(r"\b(The|This|Under|Within|Both)$", "", token).strip()
-        if token.lower() in stop_terms:
+        lowered = token.lower()
+        if lowered in stop_terms:
+            continue
+        if lowered.startswith(("these ", "this ", "the ")):
+            continue
+        if "referenced" in lowered and "gps" not in lowered and "gnss" not in lowered:
             continue
         if len(token) < 3:
             continue
         cleaned.setdefault(token.lower(), _canonical_term(token))
     return list(cleaned.values())
+
+
+def _usable_detail_tokens(tokens: list[str]) -> list[str]:
+    generic = {
+        "gnss",
+        "gps",
+        "slam",
+        "lidar",
+        "imu",
+        "vio",
+        "livo",
+        "visual",
+        "camera",
+        "localization",
+        "navigation",
+        "mapping",
+        "odometry",
+        "fusion",
+        "dataset",
+        "benchmark",
+        "robot",
+        "table",
+        "table i",
+        "table ii",
+        "table iii",
+        "table iv",
+    }
+    blocked_fragments = (
+        "omponent- wise",
+        "component- wise",
+        "ablation",
+        "sion",
+        "avg ",
+    )
+    blocked_exact = {
+        "idar",
+        "isual",
+        "nfo",
+        "orm",
+    }
+    cleaned: list[str] = []
+    for token in tokens:
+        item = token.strip()
+        lowered = item.lower()
+        if not item or lowered in generic or lowered in blocked_exact:
+            continue
+        if any(fragment in lowered for fragment in blocked_fragments):
+            continue
+        cleaned.append(item)
+    if cleaned:
+        return list(dict.fromkeys(cleaned))
+    return []
+
+
+def _looks_like_technical_name(token: str) -> bool:
+    token = token.strip(" ,.;:()[]")
+    if not token:
+        return False
+    lowered = token.lower()
+    if lowered.startswith(("the ", "this ", "these ", "where ", "while ")):
+        return False
+    if lowered in {"command measured entry", "gps-referenced yas-region", "yas-region", "idar", "isual", "nfo", "orm"}:
+        return False
+    if re.search(r"\b[A-Z]{2,}\b", token):
+        return True
+    if re.search(r"\d", token):
+        return True
+    if any(mark in token for mark in ("/", "+")):
+        return True
+    allowed = (
+        "HackRF",
+        "Commsignia",
+        "Septentrio",
+        "Livox",
+        "Jetson",
+        "Yas Marina",
+    )
+    return any(name.lower() in lowered for name in allowed)
 
 
 def _authors(paper: dict[str, Any]) -> str:
