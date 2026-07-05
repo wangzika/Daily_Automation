@@ -18,6 +18,7 @@ from daily_gnss_slam_digest.deepdive import (
     _extract_base64_image,
     _figure_reading,
     _figure_section,
+    _has_real_figure_caption,
     _file_url,
     _image_variants,
     _is_low_information_image,
@@ -163,7 +164,7 @@ class DeepDiveContentTest(unittest.TestCase):
             _sample_figure(result_b, "trajectory")
 
             figures = [
-                DeepDiveFigure(cover, "Fig. 1. System overview of SA-LIVO."),
+                DeepDiveFigure(cover, "Fig. 1. Sensor platform and data collection scenario."),
                 DeepDiveFigure(method, "Fig. 2. Proposed pipeline of the subspace-aware fusion module."),
                 DeepDiveFigure(result_a, "Fig. 2. Representative mapping results of SA-LIVO across diverse environments."),
                 DeepDiveFigure(result_b, "Fig. 3. Trajectory evaluation on campus sequences."),
@@ -199,6 +200,27 @@ class DeepDiveContentTest(unittest.TestCase):
             self.assertEqual(len(prepared), 1)
             self.assertEqual(prepared[0].path, method)
 
+    def test_reliable_captioned_figures_win_over_embedded_fallbacks_in_same_section(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            reliable = tmp_path / "reliable.jpg"
+            fallback = tmp_path / "fallback.jpg"
+            _sample_figure(reliable, "trajectory")
+            _sample_figure(fallback, "fallback")
+
+            prepared = _prepare_article_figures(
+                [
+                    DeepDiveFigure(reliable, "Fig. 6. Trajectory comparisons across four datasets.", source="paper_render"),
+                    DeepDiveFigure(fallback, "PDF 内嵌图片 3（未匹配到可靠图注）", source="paper_embedded"),
+                ],
+                tmp_path,
+                2,
+            )
+
+            self.assertEqual(len(prepared), 1)
+            self.assertEqual(prepared[0].source, "experiment_group")
+            self.assertEqual(prepared[0].children, ("Fig. 6. Trajectory comparisons across four datasets.",))
+
     def test_bbox_caption_parser_finds_captions_not_text_references(self) -> None:
         bbox_text = """
         <html><body><doc>
@@ -208,6 +230,12 @@ class DeepDiveContentTest(unittest.TestCase):
               <word xMin="341.000000" yMin="100.000000" xMax="348.000000" yMax="110.000000">2</word>
               <word xMin="352.000000" yMin="100.000000" xMax="378.000000" yMax="110.000000">shows</word>
               <word xMin="382.000000" yMin="100.000000" xMax="410.000000" yMax="110.000000">the</word>
+            </line></block></flow>
+            <flow><block><line xMin="323.000000" yMin="150.000000" xMax="558.000000" yMax="160.000000">
+              <word xMin="323.000000" yMin="150.000000" xMax="338.000000" yMax="160.000000">Fig.</word>
+              <word xMin="341.000000" yMin="150.000000" xMax="352.000000" yMax="160.000000">2,</word>
+              <word xMin="356.000000" yMin="150.000000" xMax="380.000000" yMax="160.000000">while</word>
+              <word xMin="384.000000" yMin="150.000000" xMax="410.000000" yMax="160.000000">the</word>
             </line></block></flow>
             <flow><block><line xMin="54.000000" yMin="210.000000" xMax="558.000000" yMax="220.000000">
               <word xMin="54.000000" yMin="210.000000" xMax="70.000000" yMax="220.000000">Fig.</word>
@@ -271,6 +299,66 @@ class DeepDiveContentTest(unittest.TestCase):
             ),
             "experiment",
         )
+        self.assertEqual(
+            _figure_section(
+                DeepDiveFigure(
+                    Path("trajectory.jpg"),
+                    "Fig. 2. Trajectories from FAST-LIVO (black), GPS (blue), and the proposed method.",
+                    source="paper_render",
+                )
+            ),
+            "experiment",
+        )
+        self.assertEqual(
+            _figure_section(
+                DeepDiveFigure(
+                    Path("fusion.jpg"),
+                    "Fig. 4. Subspace-Aware Information Fusion via the linear-clamp soft gate.",
+                    source="paper_render",
+                )
+            ),
+            "method",
+        )
+        self.assertEqual(
+            _figure_section(
+                DeepDiveFigure(
+                    Path("spherical-results.jpg"),
+                    "Fig. 5. Camera configurations and spherical triangulation results of four setups.",
+                    source="paper_render",
+                )
+            ),
+            "experiment",
+        )
+        self.assertEqual(
+            _figure_section(
+                DeepDiveFigure(
+                    Path("sphere-overview.jpg"),
+                    "Fig. 1. Overview of the Sphere-VIO framework for multi-camera-to-spherical mapping.",
+                    source="paper_render",
+                )
+            ),
+            "method",
+        )
+        self.assertEqual(
+            _figure_section(
+                DeepDiveFigure(
+                    Path("forward-mapping.jpg"),
+                    "Fig. 2. Forward mapping of the proposed USPM.",
+                    source="paper_render",
+                )
+            ),
+            "method",
+        )
+
+    def test_unmatched_embedded_figures_are_not_treated_as_captioned_figures(self) -> None:
+        caption = "PDF 内嵌图片 7（未匹配到可靠图注）"
+
+        self.assertFalse(_has_real_figure_caption(caption))
+        self.assertEqual(
+            _figure_section(DeepDiveFigure(Path("embedded.jpg"), caption, source="paper_embedded")),
+            "experiment",
+        )
+        self.assertEqual(_display_figure_caption(caption, 1, source="paper_embedded"), "论文图：从 PDF 提取的论文原图")
 
     def test_polished_text_overrides_traditional_text(self) -> None:
         paper = {"title": "Example", "authors": [], "abstract": "GNSS spoofing risk.", "matched_terms": ["gnss"]}

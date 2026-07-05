@@ -808,8 +808,8 @@ def _extract_figures(
     figure_keywords: tuple[str, ...] = (),
 ) -> list[DeepDiveFigure]:
     candidates = [
-        *_embedded_figure_candidates(pdf_path, output_dir, captions, figure_keywords),
         *_rendered_figure_candidates(pdf_path, output_dir, figure_keywords),
+        *_embedded_figure_candidates(pdf_path, output_dir, captions, figure_keywords),
     ]
     candidates.sort(key=lambda item: item[0], reverse=True)
 
@@ -857,11 +857,11 @@ def _embedded_figure_candidates(
             continue
         if _is_low_information_image(image):
             continue
-        caption = _caption_for(captions, raw_index)
-        if not _has_real_figure_caption(caption) and _looks_like_icon_or_logo(image):
+        if _looks_like_icon_or_logo(image):
             continue
-        score = _paper_figure_score(image, caption, figure_keywords)
-        candidates.append((score, caption, image, "paper"))
+        caption = _unmatched_embedded_caption(raw_index)
+        score = _paper_figure_score(image, caption, figure_keywords) - 18.0
+        candidates.append((score, caption, image, "paper_embedded"))
     return candidates
 
 
@@ -1038,10 +1038,12 @@ def _caption_anchors_from_lines(
 
 
 def _figure_caption_number(text: str) -> str:
-    match = re.match(r"^Fig(?:ure)?\.?\s*(\d+)[.:]?\s*(.*)$", text.strip(), re.IGNORECASE)
+    match = re.match(r"^Fig(?:ure)?\.?\s*(\d+)(?P<sep>[.:])?\s*(?P<body>.*)$", text.strip(), re.IGNORECASE)
     if not match:
         return ""
-    body = match.group(2).strip()
+    body = match.group("body").strip()
+    if body.startswith((",", ";")):
+        return ""
     if _caption_body_looks_like_reference(body):
         return ""
     return match.group(1)
@@ -1052,6 +1054,7 @@ def _caption_body_looks_like_reference(body: str) -> bool:
         return False
     first = re.split(r"\s+", body, maxsplit=1)[0].strip(".,:;()[]").lower()
     return first in {
+        "and",
         "shows",
         "presents",
         "depicts",
@@ -1064,6 +1067,8 @@ def _caption_body_looks_like_reference(body: str) -> bool:
         "provides",
         "gives",
         "analyzes",
+        "where",
+        "while",
     }
 
 
@@ -1327,6 +1332,10 @@ def _caption_for(captions: list[str], index: int) -> str:
     return f"论文原图 {index}（从 PDF 直接提取）"
 
 
+def _unmatched_embedded_caption(index: int) -> str:
+    return f"PDF 内嵌图片 {index}（未匹配到可靠图注）"
+
+
 def _display_figure_caption(caption: str, display_index: int, source: str = "paper") -> str:
     caption = _clean_figure_caption(caption)
     if source == "ai":
@@ -1424,6 +1433,8 @@ def _has_real_figure_caption(caption: str) -> bool:
     return not (
         caption.startswith("论文原图")
         or caption.startswith("论文 PDF")
+        or caption.startswith("PDF 内嵌图片")
+        or "未匹配到可靠图注" in caption
         or re.match(r"^pdf\s+page\b", caption, re.IGNORECASE)
     )
 
@@ -1550,7 +1561,9 @@ def _prepare_article_figures(source_figures: list[DeepDiveFigure], output_dir: P
         grouped: list[DeepDiveFigure] = []
         used_paths: set[Path] = set()
         for section in FIGURE_SECTION_ORDER:
-            candidate = next((figure for figure in section_candidates[section] if figure.path not in used_paths), None)
+            candidates = [figure for figure in section_candidates[section] if figure.path not in used_paths]
+            reliable_candidates = [figure for figure in candidates if _has_real_figure_caption(figure.caption)]
+            candidate = next(iter(reliable_candidates or candidates), None)
             if candidate:
                 grouped.append(_as_group_figure(candidate, section))
                 used_paths.add(candidate.path)
@@ -1560,6 +1573,9 @@ def _prepare_article_figures(source_figures: list[DeepDiveFigure], output_dir: P
     used_paths: set[Path] = set()
     for section in FIGURE_SECTION_ORDER:
         candidates = [figure for figure in section_candidates[section] if figure.path not in used_paths]
+        reliable_candidates = [figure for figure in candidates if _has_real_figure_caption(figure.caption)]
+        if reliable_candidates:
+            candidates = reliable_candidates
         if not candidates:
             continue
         group = _make_figure_group(candidates[: _figure_group_limit(section)], output_dir, section)
@@ -1693,10 +1709,16 @@ def _figure_section(figure: DeepDiveFigure) -> str:
         return section
     if figure.source == "pdf_page":
         return "intro"
-    if _is_experiment_figure(figure):
-        return "experiment"
 
     caption = figure.caption.lower()
+    if _is_strong_experiment_caption(caption):
+        return "experiment"
+    if _is_method_caption(caption):
+        return "method"
+    if _is_experiment_figure(figure):
+        return "experiment"
+    if figure.source == "paper_embedded":
+        return "experiment"
     if any(
         term in caption
         for term in (
@@ -1753,25 +1775,77 @@ def _figure_section(figure: DeepDiveFigure) -> str:
     return "method"
 
 
+def _is_method_caption(caption: str) -> bool:
+    return any(
+        term in caption
+        for term in (
+            "architecture",
+            "framework",
+            "pipeline",
+            "workflow",
+            "flow",
+            "system overview",
+            "block diagram",
+            "network",
+            "algorithm",
+            "registration",
+            "hash map",
+            "voxel",
+            "kalman",
+            "filter",
+            "sensor fusion",
+            "information fusion",
+            "subspace-aware",
+            "soft gate",
+            "gate",
+            "eigen",
+            "jacobian",
+            "residual",
+            "factor graph",
+            "optimization",
+            "forward mapping",
+            "state update",
+            "covariance",
+            "reprojection",
+            "geometric illustration",
+            "架构",
+            "框架",
+            "流程",
+            "结构",
+            "方法",
+            "算法",
+            "融合",
+            "优化",
+        )
+    )
+
+
 def _is_experiment_figure(figure: DeepDiveFigure) -> bool:
     if figure.source in {"ai", "pdf_page"}:
         return False
     caption = figure.caption.lower()
-    if any(term in caption for term in ("system overview", "framework", "architecture", "pipeline", "workflow", "block diagram")):
+    if _is_method_caption(caption) and not _is_strong_experiment_caption(caption):
         return False
+    return _is_experiment_caption(caption)
+
+
+def _is_strong_experiment_caption(caption: str) -> bool:
     return any(
-        term in caption
+        _caption_contains_term(caption, term)
         for term in (
             "experiment",
             "experimental setup",
             "evaluation setup",
             "evaluation",
             "result",
-            "mapping",
             "trajectory",
-            "odometry",
-            "localization",
-            "pose",
+            "trajectories",
+            "estimated",
+            "estimation",
+            "accuracy",
+            "error",
+            "failure",
+            "recovery",
             "benchmark",
             "performance",
             "dataset",
@@ -1794,6 +1868,19 @@ def _is_experiment_figure(figure: DeepDiveFigure) -> bool:
             "speed",
         )
     )
+
+
+def _is_experiment_caption(caption: str) -> bool:
+    weak_terms = ("mapping", "odometry", "localization", "pose")
+    return _is_strong_experiment_caption(caption) or any(_caption_contains_term(caption, term) for term in weak_terms)
+
+
+def _caption_contains_term(caption: str, term: str) -> bool:
+    if " " in term or "-" in term:
+        return term in caption
+    if len(term) <= 5:
+        return re.search(rf"\b{re.escape(term)}\b", caption) is not None
+    return term in caption
 
 
 def _generate_ai_cover_figure(paper: dict[str, Any], reading: PaperReading, output_dir: Path) -> DeepDiveFigure | None:

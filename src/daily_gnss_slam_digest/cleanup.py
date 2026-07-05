@@ -4,6 +4,7 @@ import argparse
 import os
 import re
 import shutil
+import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -191,12 +192,29 @@ class OutputCleaner:
         if self.config.dry_run:
             print(f"Would remove: {resolved}")
             return 1
-        if resolved.is_dir():
-            shutil.rmtree(resolved)
-        else:
-            resolved.unlink()
+        self._remove_with_retry(resolved)
         print(f"Removed: {resolved}")
         return 1
+
+    def _remove_with_retry(self, resolved: Path) -> None:
+        last_error: OSError | None = None
+        for attempt in range(3):
+            try:
+                if resolved.is_dir():
+                    shutil.rmtree(resolved)
+                else:
+                    resolved.unlink()
+                return
+            except FileNotFoundError:
+                return
+            except OSError as exc:
+                last_error = exc
+                if attempt < 2:
+                    time.sleep(0.15 * (attempt + 1))
+                    continue
+                raise
+        if last_error:
+            raise last_error
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
