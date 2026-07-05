@@ -324,7 +324,7 @@ launchctl kickstart -k gui/$(id -u)/com.codex.daily-gnss-slam-digest
 | `DEEPDIVE_RENDER_FIGURE_DPI` | `200` | 页面渲染分辨率；更高更清晰但更慢 |
 | `DEEPDIVE_DOWNLOAD_RETRIES` | `3` | 单篇论文 PDF 下载失败时的重试次数 |
 
-正文文案默认 `DEEPDIVE_TEXT_POLISH_MODE=api`，会按 `DEEPDIVE_TEXT_POLISH_PROVIDERS=gemini,siliconflow` 的顺序润色：先试 Gemini；如果 Gemini 额度不足、API 不可用或没有配置 Key，会自动尝试 SiliconFlow；两个都不可用时才回退到传统本地文案。草稿邮件会标明“解读模式”和“配图模式”，例如“AI 润色（Gemini）”“AI 润色（SiliconFlow）”或“传统模板”。实验/结果类图片默认 `DEEPDIVE_EXPERIMENT_COMPOSITE=1`，会合成为一张组合图再做整体解释。
+正文文案默认 `DEEPDIVE_TEXT_POLISH_MODE=api`，会按 `DEEPDIVE_TEXT_POLISH_PROVIDERS=gemini,siliconflow,ollama` 的顺序润色：先试 Gemini；如果 Gemini 额度不足、API 不可用或没有配置 Key，会自动尝试 SiliconFlow；云端仍不可用时会尝试本地 Ollama；最后才回退到传统本地文案。草稿邮件会标明“解读模式”和“配图模式”，例如“AI 润色（Gemini）”“AI 润色（SiliconFlow）”“本地模型润色（Ollama）”或“传统模板”。实验/结果类图片默认 `DEEPDIVE_EXPERIMENT_COMPOSITE=1`，会合成为一张组合图再做整体解释。
 
 如果要让每日自动化默认生成两个版本，把 `.env` 改成：
 
@@ -342,6 +342,18 @@ SILICONFLOW_API_KEY=你的 SiliconFlow Key
 SILICONFLOW_TEXT_MODEL=deepseek-ai/DeepSeek-V3
 SILICONFLOW_TEXT_RESPONSE_FORMAT=0
 ```
+
+如果只想用本地 Ollama 做正文润色，可以设置：
+
+```env
+DEEPDIVE_TEXT_POLISH_MODE=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_TEXT_MODEL=qwen2.5:3b
+OLLAMA_TEXT_FORMAT_JSON=1
+OLLAMA_TEXT_BATCH_SIZE=4
+```
+
+`OLLAMA_TEXT_BATCH_SIZE` 控制本地模型每次润色多少段正文。Mac 本地模型建议保持 `3-5`，太大会更容易超时；太小会更稳但总耗时更长。默认使用 `qwen2.5:3b`，更适合日常兜底；如果机器内存和时间都充足，可以改成 `qwen2.5:7b`。
 
 只生成本周热点汇总：
 

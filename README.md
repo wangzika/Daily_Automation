@@ -180,7 +180,7 @@ PYTHONPATH=src python scripts/upload_cover_to_wechat.py outputs/wechat-cover-gns
 
 其中 `paper` 版本只使用论文原图，并按 `DEEPDIVE_FIGURE_KEYWORDS` 里的关键词优先匹配流程图、框架图、系统图；`ai` 版本会用 `GEMINI_API_KEY` 生成 16:9 概念图，再保留论文分章节图组辅助解读。默认模式由 `.env` 里的 `DEEPDIVE_IMAGE_MODE=paper|ai|both` 控制。默认 `DEEPDIVE_LIMIT=5`，会覆盖每日推荐里的 5 篇论文；注意：`both` 是对比模式，会让每篇论文生成两份草稿，例如 `DEEPDIVE_LIMIT=5` 时会生成 10 篇草稿。
 
-正文文案默认优先用 Gemini 做轻量润色；如果 Gemini 额度不足或不可用，会按 `DEEPDIVE_TEXT_POLISH_PROVIDERS=gemini,siliconflow` 的顺序自动尝试 SiliconFlow，再失败才回退传统本地文案。邮件通知里会标明“解读模式：AI 润色（Gemini）”“AI 润色（SiliconFlow）”或“传统模板”。图片会先用 `pdfimages` 抽取内嵌图片，再用 `pdftoppm + pdftotext -bbox` 按图注位置从渲染页面裁剪矢量流程图、架构图和结构图；随后过滤纯黑、纯白、低信息量抽图和无图注小图标，再按介绍、方法、实验三类合成为章节图组，避免一张张图机械铺开。
+正文文案默认优先用 Gemini 做轻量润色；如果 Gemini 额度不足或不可用，会按 `DEEPDIVE_TEXT_POLISH_PROVIDERS=gemini,siliconflow,ollama` 的顺序自动尝试 SiliconFlow 和本地 Ollama，再失败才回退传统本地文案。邮件通知里会标明“解读模式：AI 润色（Gemini）”“AI 润色（SiliconFlow）”“本地模型润色（Ollama）”或“传统模板”。Ollama 会按 `OLLAMA_TEXT_BATCH_SIZE` 分批处理正文，默认每批 4 段，默认模型是更适合 Mac 日常兜底的 `qwen2.5:3b`。图片会先用 `pdfimages` 抽取内嵌图片，再用 `pdftoppm + pdftotext -bbox` 按图注位置从渲染页面裁剪矢量流程图、架构图和结构图；随后过滤纯黑、纯白、低信息量抽图和无图注小图标，再按介绍、方法、实验三类合成为章节图组，避免一张张图机械铺开。
 
 两个抽图参数可以在 `.env` 里调：
 

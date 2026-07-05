@@ -20,6 +20,7 @@ from daily_gnss_slam_digest.deepdive import (
     _domain_profile,
     _evidence_summary,
     _extract_base64_image,
+    _extract_ollama_message_text,
     _extract_openai_message_text,
     _figure_reading,
     _figure_section,
@@ -418,14 +419,18 @@ class DeepDiveContentTest(unittest.TestCase):
         self.assertEqual(_content_mode_label("api"), "AI 润色（Gemini）")
         self.assertEqual(_content_mode_label("gemini"), "AI 润色（Gemini）")
         self.assertEqual(_content_mode_label("siliconflow"), "AI 润色（SiliconFlow）")
+        self.assertEqual(_content_mode_label("ollama"), "本地模型润色（Ollama）")
         self.assertEqual(_content_mode_label("fallback"), "传统模板（AI 不可用时回退）")
 
     def test_text_polish_provider_order_and_openai_payload(self) -> None:
-        self.assertEqual(_text_polish_provider_order("api"), ("gemini", "siliconflow"))
+        self.assertEqual(_text_polish_provider_order("api"), ("gemini", "siliconflow", "ollama"))
         self.assertEqual(_text_polish_provider_order("siliconflow"), ("siliconflow",))
+        self.assertEqual(_text_polish_provider_order("ollama"), ("ollama",))
 
         payload = {"choices": [{"message": {"content": '{"one_sentence":"润色后的文本。"}'}}]}
         self.assertEqual(_extract_openai_message_text(payload), '{"one_sentence":"润色后的文本。"}')
+        ollama_payload = {"message": {"content": '{"one_sentence":"本地润色后的文本。"}'}}
+        self.assertEqual(_extract_ollama_message_text(ollama_payload), '{"one_sentence":"本地润色后的文本。"}')
         cleaned = _clean_text_polish_payload({"one_sentence": "润色后的文本。", "unknown": "忽略"}, {"one_sentence": "原文"})
 
         self.assertEqual(cleaned, {"one_sentence": "润色后的文本。"})

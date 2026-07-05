@@ -330,7 +330,7 @@ def _notify_deepdive_drafts_created(
             lines.append("   阅读原文：")
             lines.extend(f"   - {line}" for line in source_lines)
         reason = str(draft.get("content_reason") or "")
-        if str(draft.get("content_mode") or "") not in {"api", "gemini", "siliconflow"} and reason:
+        if str(draft.get("content_mode") or "") not in {"api", "gemini", "siliconflow", "ollama"} and reason:
             lines.append(f"   回退原因：{reason}")
 
     if publish_blocked_reason:
@@ -354,6 +354,8 @@ def _content_mode_label(mode: str) -> str:
         return "AI 润色（Gemini）"
     if mode == "siliconflow":
         return "AI 润色（SiliconFlow）"
+    if mode == "ollama":
+        return "本地模型润色（Ollama）"
     if mode == "disabled":
         return "传统模板"
     return "传统模板（AI 不可用时回退）"
@@ -2109,7 +2111,9 @@ def _text_polish_provider_order(mode: str) -> tuple[str, ...]:
         return ("gemini",)
     if mode in {"siliconflow", "silicon", "sf"}:
         return ("siliconflow",)
-    configured = os.getenv("DEEPDIVE_TEXT_POLISH_PROVIDERS", "gemini,siliconflow")
+    if mode in {"ollama", "local"}:
+        return ("ollama",)
+    configured = os.getenv("DEEPDIVE_TEXT_POLISH_PROVIDERS", "gemini,siliconflow,ollama")
     providers = []
     for item in re.split(r"[,，;；\s]+", configured):
         provider = item.strip().lower()
@@ -2117,9 +2121,11 @@ def _text_polish_provider_order(mode: str) -> tuple[str, ...]:
             provider = "gemini"
         if provider in {"silicon", "sf"}:
             provider = "siliconflow"
-        if provider in {"gemini", "siliconflow"} and provider not in providers:
+        if provider in {"local"}:
+            provider = "ollama"
+        if provider in {"gemini", "siliconflow", "ollama"} and provider not in providers:
             providers.append(provider)
-    return tuple(providers or ["gemini", "siliconflow"])
+    return tuple(providers or ["gemini", "siliconflow", "ollama"])
 
 
 def _run_text_polish_provider(provider: str, paper: dict[str, Any], raw_texts: dict[str, str]) -> dict[str, str]:
@@ -2133,6 +2139,8 @@ def _run_text_polish_provider(provider: str, paper: dict[str, Any], raw_texts: d
         if not api_key:
             raise RuntimeError("missing SILICONFLOW_API_KEY")
         return _request_siliconflow_text_polish(api_key, paper, raw_texts)
+    if provider == "ollama":
+        return _request_ollama_text_polish(paper, raw_texts)
     raise RuntimeError(f"unsupported text polish provider: {provider}")
 
 
@@ -2141,6 +2149,8 @@ def _text_polish_provider_name(provider: str) -> str:
         return "SiliconFlow"
     if provider == "gemini":
         return "Gemini"
+    if provider == "ollama":
+        return "Ollama"
     return provider
 
 
@@ -2149,6 +2159,8 @@ def _text_polish_provider_reason(provider: str) -> str:
         return f"SiliconFlow text model: {_siliconflow_text_model()}"
     if provider == "gemini":
         return f"Gemini text model: {_gemini_text_model()}"
+    if provider == "ollama":
+        return f"Ollama local model: {_ollama_text_model()}"
     return f"text model provider: {provider}"
 
 
@@ -2257,12 +2269,84 @@ def _request_siliconflow_text_polish(api_key: str, paper: dict[str, Any], texts:
     }
 
 
+def _request_ollama_text_polish(paper: dict[str, Any], texts: dict[str, str]) -> dict[str, str]:
+    batch_size = _ollama_text_batch_size()
+    if len(texts) > batch_size:
+        polished: dict[str, str] = {}
+        items = list(texts.items())
+        for offset in range(0, len(items), batch_size):
+            batch = dict(items[offset : offset + batch_size])
+            polished.update(_request_ollama_text_polish_batch(paper, batch))
+        return polished
+    return _request_ollama_text_polish_batch(paper, texts)
+
+
+def _request_ollama_text_polish_batch(paper: dict[str, Any], texts: dict[str, str]) -> dict[str, str]:
+    base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+    endpoint = os.getenv("OLLAMA_TEXT_ENDPOINT", f"{base_url}/api/chat")
+    aliases = {f"k{index:03d}": key for index, key in enumerate(texts, start=1)}
+    alias_texts = {alias: texts[key] for alias, key in aliases.items()}
+    body: dict[str, Any] = {
+        "model": _ollama_text_model(),
+        "messages": [
+            {
+                "role": "system",
+                "content": "你是中文科技公众号编辑，只返回合法 JSON 对象。",
+            },
+            {
+                "role": "user",
+                "content": _text_polish_prompt(paper, alias_texts),
+            },
+        ],
+        "stream": False,
+        "options": {
+            "temperature": float(os.getenv("OLLAMA_TEXT_TEMPERATURE", "0.2")),
+        },
+    }
+    if os.getenv("OLLAMA_TEXT_FORMAT_JSON", "1").lower() in {"1", "true", "yes", "on"}:
+        body["format"] = "json"
+    request = urllib.request.Request(
+        endpoint,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=float(os.getenv("OLLAMA_TEXT_TIMEOUT_SECONDS", "240"))) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"Ollama text API HTTP {exc.code}: {detail}") from exc
+    text = _extract_ollama_message_text(payload) or _extract_openai_message_text(payload)
+    if not text:
+        raise RuntimeError("Ollama text API response did not include message content")
+    data = json.loads(_extract_json_object(text))
+    if not isinstance(data, dict):
+        raise RuntimeError("Ollama text polish response was not a JSON object")
+    return {
+        aliases.get(str(key), str(key)): str(value)
+        for key, value in data.items()
+    }
+
+
 def _gemini_text_model() -> str:
     return os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
 
 
 def _siliconflow_text_model() -> str:
     return os.getenv("SILICONFLOW_TEXT_MODEL", "deepseek-ai/DeepSeek-V3").strip() or "deepseek-ai/DeepSeek-V3"
+
+
+def _ollama_text_model() -> str:
+    return os.getenv("OLLAMA_TEXT_MODEL", "qwen2.5:3b").strip() or "qwen2.5:3b"
+
+
+def _ollama_text_batch_size() -> int:
+    try:
+        value = int(os.getenv("OLLAMA_TEXT_BATCH_SIZE", "4"))
+    except ValueError:
+        return 4
+    return min(max(value, 1), 20)
 
 
 def _text_polish_prompt(paper: dict[str, Any], texts: dict[str, str]) -> str:
@@ -2319,6 +2403,19 @@ def _extract_openai_message_text(payload: Any) -> str:
         output = payload.get("output")
         if isinstance(output, str):
             return output.strip()
+    return ""
+
+
+def _extract_ollama_message_text(payload: Any) -> str:
+    if isinstance(payload, dict):
+        message = payload.get("message")
+        if isinstance(message, dict):
+            content = message.get("content")
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+        response = payload.get("response")
+        if isinstance(response, str):
+            return response.strip()
     return ""
 
 
