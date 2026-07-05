@@ -97,6 +97,6 @@
 
 ## 明日检索关键词
 
-`robust odometry`、`LiDAR-inertial odometry`、`visual-inertial odometry`、`factor graph fusion`、`degeneracy-aware odometry`、`sensor degradation`。
+`embodied navigation`、`vision-language navigation`、`object navigation`、`navigation foundation model`、`mobile robot policy`、`VLM navigation`。
 
 > 具体实验结论建议回到原文核对后再引用。
