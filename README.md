@@ -78,7 +78,8 @@ cp .env.example .env
 
 - `WECHAT_APP_ID`: 公众号 AppID。
 - `WECHAT_APP_SECRET`: 公众号 AppSecret。
-- `WECHAT_THUMB_MEDIA_ID`: 图文封面素材 `media_id`，微信草稿接口必填。
+- `WECHAT_DAILY_THEME_COVER`: 默认 `1`，每日推荐草稿会把当天主题图上传为图文封面。
+- `WECHAT_THUMB_MEDIA_ID`: 固定封面素材 `media_id`；当关闭每日主题封面，或主题封面上传失败时作为回退封面。
 - `WECHAT_AUTHOR`: 文章作者名，默认 `波波机器人`。
 - `WECHAT_PUBLISH_MODE`: `none`、`draft` 或 `publish`。
 

@@ -232,6 +232,14 @@ TOPIC_ROTATION_ENABLED=on
 3. 如果当天主题没有强匹配论文，自动退回七日热点主题池做补位检索。
 4. 如果设置 `TOPIC_ROTATION_ENABLED=off`，回到旧的 GNSS / 融合 / SLAM 综合检索。
 
+每日推荐草稿的主图默认跟随当天主题：系统会生成 `outputs/YYYY-MM-DD-topic-header.jpg`，并在创建微信草稿时上传为封面素材。可用下面配置关闭：
+
+```bash
+WECHAT_DAILY_THEME_COVER=0
+```
+
+关闭后会使用 `.env` 里的 `WECHAT_THUMB_MEDIA_ID` 固定封面；如果每日主题封面上传失败且 `WECHAT_THUMB_MEDIA_ID` 存在，也会自动回退到固定封面。
+
 手动测试某一天的轮换主题：
 
 ```bash

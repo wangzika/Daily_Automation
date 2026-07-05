@@ -6,7 +6,7 @@ import os
 import sys
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from .arxiv_client import ArxivClient, ArxivClientError
 from .assets import ensure_article_assets
@@ -239,13 +239,19 @@ def main(argv: list[str] | None = None) -> int:
     source_url = recommendations[0].paper.url
 
     try:
-        config = WeChatConfig.from_env()
+        use_daily_theme_cover = _wechat_daily_theme_cover_enabled()
+        config = WeChatConfig.from_env(require_thumb_media_id=not use_daily_theme_cover)
         publisher = WeChatPublisher(config)
         access_token = publisher.get_access_token()
         article_image_urls = {
             key: publisher.upload_article_image(access_token, path)
             for key, path in asset_paths.items()
         }
+        thumb_media_id = (
+            _upload_daily_theme_thumb(publisher, access_token, asset_paths)
+            if use_daily_theme_cover
+            else None
+        )
         html_content = build_html(
             recommendations,
             issue_date,
@@ -259,6 +265,7 @@ def main(argv: list[str] | None = None) -> int:
             content_html=html_content,
             digest=digest,
             content_source_url=source_url,
+            thumb_media_id=thumb_media_id,
         )
         print(f"Created WeChat draft media_id: {media_id}")
         print(
@@ -299,6 +306,47 @@ def main(argv: list[str] | None = None) -> int:
         return 3
 
     return 0
+
+
+def _wechat_daily_theme_cover_enabled() -> bool:
+    value = os.getenv("WECHAT_DAILY_THEME_COVER", "1").strip().lower()
+    return value not in {"0", "false", "no", "off"}
+
+
+def _upload_daily_theme_thumb(
+    publisher: WeChatPublisher,
+    access_token: str,
+    asset_paths: Mapping[str, Path],
+) -> str | None:
+    header_path = asset_paths.get("header")
+    if not header_path:
+        if publisher.config.thumb_media_id:
+            return None
+        raise WeChatPublisherError(
+            "Daily theme cover is enabled, but the topic header image was not generated "
+            "and WECHAT_THUMB_MEDIA_ID is not configured."
+        )
+    try:
+        result = publisher.upload_permanent_image(access_token, header_path)
+    except WeChatPublisherError as exc:
+        if publisher.config.thumb_media_id:
+            print(f"Daily theme cover upload failed; using WECHAT_THUMB_MEDIA_ID fallback: {exc}", file=sys.stderr)
+            return None
+        raise WeChatPublisherError(
+            "Daily theme cover upload failed and WECHAT_THUMB_MEDIA_ID is not configured: "
+            f"{exc}"
+        ) from exc
+    media_id = str(result.get("media_id") or "")
+    if not media_id:
+        if publisher.config.thumb_media_id:
+            print(
+                f"Daily theme cover upload response missing media_id; using WECHAT_THUMB_MEDIA_ID fallback: {result}",
+                file=sys.stderr,
+            )
+            return None
+        raise WeChatPublisherError(f"Daily theme cover upload response missing media_id: {result}")
+    print(f"Uploaded daily theme cover media_id: {media_id}")
+    return media_id
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

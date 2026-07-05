@@ -2,13 +2,21 @@ from __future__ import annotations
 
 import unittest
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from daily_gnss_slam_digest.article import build_html, build_markdown
-from daily_gnss_slam_digest.cli import _rerank_loaded_recommendations
+from daily_gnss_slam_digest.cli import (
+    _rerank_loaded_recommendations,
+    _upload_daily_theme_thumb,
+    _wechat_daily_theme_cover_enabled,
+)
 from daily_gnss_slam_digest.config import ROTATING_TOPICS, rotating_topic_for_date
 from daily_gnss_slam_digest.models import Paper, RecommendedPaper
 from daily_gnss_slam_digest.recommender import recommend
 from daily_gnss_slam_digest.sample_data import SAMPLE_PAPERS
+from daily_gnss_slam_digest.wechat import WeChatPublisherError
 
 
 class TopicRotationTest(unittest.TestCase):
@@ -104,6 +112,35 @@ class TopicRotationTest(unittest.TestCase):
 
         self.assertEqual([item.paper.title for item in reranked], ["GNSS Jamming Detection with AGC and CNO Observables"])
 
+    def test_daily_theme_cover_is_enabled_by_default(self) -> None:
+        with patch.dict("os.environ", {}, clear=True):
+            self.assertTrue(_wechat_daily_theme_cover_enabled())
+        with patch.dict("os.environ", {"WECHAT_DAILY_THEME_COVER": "0"}, clear=True):
+            self.assertFalse(_wechat_daily_theme_cover_enabled())
+
+    def test_daily_theme_cover_upload_uses_topic_header_media_id(self) -> None:
+        publisher = _FakePublisher(thumb_media_id="fixed-thumb", upload_result={"media_id": "theme-thumb"})
+
+        media_id = _upload_daily_theme_thumb(publisher, "token", {"header": Path("topic-header.jpg")})
+
+        self.assertEqual(media_id, "theme-thumb")
+        self.assertEqual(publisher.uploaded_paths, [Path("topic-header.jpg")])
+
+    def test_daily_theme_cover_falls_back_to_static_thumb_on_upload_error(self) -> None:
+        publisher = _FakePublisher(thumb_media_id="fixed-thumb", upload_error=WeChatPublisherError("blocked"))
+
+        media_id = _upload_daily_theme_thumb(publisher, "token", {"header": Path("topic-header.jpg")})
+
+        self.assertIsNone(media_id)
+        self.assertEqual(publisher.uploaded_paths, [Path("topic-header.jpg")])
+
+    def test_daily_theme_cover_requires_some_thumb_when_upload_fails(self) -> None:
+        publisher = _FakePublisher(thumb_media_id="", upload_error=WeChatPublisherError("blocked"))
+
+        with self.assertRaisesRegex(WeChatPublisherError, "WECHAT_THUMB_MEDIA_ID"):
+            _upload_daily_theme_thumb(publisher, "token", {"header": Path("topic-header.jpg")})
+
+
 def _recommendation(title: str, abstract: str, published: datetime) -> RecommendedPaper:
     return RecommendedPaper(
         paper=Paper(
@@ -119,6 +156,25 @@ def _recommendation(title: str, abstract: str, published: datetime) -> Recommend
         ),
         score=0.0,
     )
+
+
+class _FakePublisher:
+    def __init__(
+        self,
+        thumb_media_id: str,
+        upload_result: dict[str, str] | None = None,
+        upload_error: WeChatPublisherError | None = None,
+    ) -> None:
+        self.config = SimpleNamespace(thumb_media_id=thumb_media_id)
+        self.upload_result = upload_result or {}
+        self.upload_error = upload_error
+        self.uploaded_paths: list[Path] = []
+
+    def upload_permanent_image(self, access_token: str, image_path: Path) -> dict[str, str]:
+        self.uploaded_paths.append(image_path)
+        if self.upload_error:
+            raise self.upload_error
+        return self.upload_result
 
 
 if __name__ == "__main__":
