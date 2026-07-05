@@ -71,6 +71,9 @@ class DeepDiveContentTest(unittest.TestCase):
             self.assertNotIn("引言部分", text)
             self.assertNotIn("通常", text)
             self.assertNotIn("一般", text)
+            self.assertNotIn("线索落在", text)
+            self.assertNotIn("数字线索", text)
+            self.assertNotIn("短句线索", text)
 
     def test_ai_figure_is_labeled_as_auxiliary_illustration(self) -> None:
         paper = {
@@ -173,7 +176,8 @@ class DeepDiveContentTest(unittest.TestCase):
         markdown = build_deepdive_markdown(paper, reading, figures, {}, text_polish=polish)
 
         self.assertIn("润色后的一句话。", markdown)
-        self.assertEqual(_content_mode_label("api"), "API 润色")
+        self.assertEqual(_content_mode_label("api"), "AI 润色（Gemini）")
+        self.assertEqual(_content_mode_label("fallback"), "传统模板（AI 不可用时回退）")
 
     def test_article_includes_read_original_links(self) -> None:
         paper = {

@@ -294,7 +294,7 @@ def _notify_deepdive_drafts_created(
             [
                 f"{index}. {draft['title']}",
                 f"   media_id：{draft['media_id']}",
-                f"   内容模式：{_content_mode_label(str(draft.get('content_mode') or 'fallback'))}",
+                f"   解读模式：{_content_mode_label(str(draft.get('content_mode') or 'fallback'))}",
                 f"   配图模式：{draft.get('image_mode') or '论文原图'}",
                 "   解读下载：",
                 f"   - HTML版：{_file_url(str(draft.get('html_path') or ''))}",
@@ -327,10 +327,10 @@ def _notify_deepdive_drafts_created(
 
 def _content_mode_label(mode: str) -> str:
     if mode == "api":
-        return "API 润色"
+        return "AI 润色（Gemini）"
     if mode == "disabled":
-        return "传统模式"
-    return "传统回退"
+        return "传统模板"
+    return "传统模板（AI 不可用时回退）"
 
 
 def _file_url(path_text: str) -> str:
@@ -1296,6 +1296,7 @@ def _request_gemini_text_polish(api_key: str, paper: dict[str, Any], texts: dict
     prompt = (
         "你是中文科技公众号编辑。请润色下面这组论文解读文案，只提升自然度、顺滑度和可读性，"
         "不要新增事实，不要删除关键风险机制、方法机制、实验机制，不要加入“AI”“自动生成”“邮件指定”等表述。"
+        "避免使用“线索落在”“数字线索”“短句线索”这类模板化句式。"
         "保持每个 key 对应一段中文文本，保留英文专有名词和单位。只返回 JSON 对象，键名必须与输入一致。\n\n"
         f"论文题目：{_display_title(paper)}\n"
         "待润色 JSON：\n"
@@ -1513,7 +1514,7 @@ def _section_narrative(section_text: str, profile: dict[str, str], role: str, fa
     if role == "experiment":
         return (
             f"实验部分重点看证据链是否完整：数据从哪里来，场景够不够真实，指标是否能说明问题。"
-            f"这篇的验证线索落在{profile['experiment']}。{anchor}。"
+            f"这篇会围绕{profile['experiment']}展开验证。{anchor}。"
             "如果图表里能同时看到成功样例和困难样例，结论就更有参考价值。"
         )
     return (
@@ -1534,12 +1535,12 @@ def _source_clues(paper: dict[str, Any], reading: PaperReading) -> list[str]:
     if reading.captions:
         caption_terms = _paper_terms_from_text(" ".join(reading.captions))[:5]
         if caption_terms:
-            clues.append(f"图注里反复出现 {', '.join(caption_terms)}，这些词多半对应系统流程、实验设置或结果展示，是读图时最容易抓住的线索。")
+            clues.append(f"图注里反复出现 {', '.join(caption_terms)}，这些词多半对应系统流程、实验设置或结果展示，读图时可以先从这里入手。")
     quality = paper.get("quality_signals") or {}
     if paper.get("code_url") or quality.get("code_signal"):
-        clues.append("这篇有代码或复现线索，读完方法后可以直接检查代码是否覆盖数据预处理、训练/检测和评估脚本。")
+        clues.append("这篇有代码或复现信息，读完方法后可以直接检查代码是否覆盖数据预处理、训练/检测和评估脚本。")
     elif quality.get("dataset_signal"):
-        clues.append("这篇有数据集或 benchmark 线索，实验部分要重点看数据来源是否贴近真实部署场景。")
+        clues.append("这篇有数据集或 benchmark 信息，实验部分要重点看数据来源是否贴近真实部署场景。")
     return clues
 
 
@@ -1776,7 +1777,7 @@ def _fallback_point(profile: dict[str, str], role: str, label: str, source: str 
         return f"检查{profile['method']}分别消耗什么输入、产生什么中间量、怎样输出给后续模块"
     if role == "experiment":
         if numbers:
-            return f"数字线索包括 {', '.join(numbers[:5])}，先看这些数字对应场景强度、速度、误差还是算力"
+            return f"先看 {', '.join(numbers[:5])} 这些数字对应场景强度、速度、误差还是算力"
         if details:
             return f"围绕 {', '.join(details[:5])} 复核数据来源、测试平台和对比对象"
         return f"把{profile['experiment']}和论文声称要解决的问题逐项对齐"
@@ -1789,13 +1790,13 @@ def _evidence_summary(claim: str) -> str:
     details = _detail_tokens(claim)
     numbers = _numbers_and_units(claim)
     if details and numbers:
-        return f"线索落在 {', '.join(details[:4])}，数字包括 {', '.join(numbers[:4])}"
+        return f"可以重点看 {', '.join(details[:4])}，同时留意 {', '.join(numbers[:4])} 这些数字"
     if details:
-        return f"线索落在 {', '.join(details[:5])}"
+        return f"可以重点看 {', '.join(details[:5])}"
     if numbers:
-        return f"数字线索包括 {', '.join(numbers[:5])}"
+        return f"相关数字包括 {', '.join(numbers[:5])}"
     phrase = _short_evidence(claim, max_words=16)
-    return f"短句线索是 {phrase}" if phrase else "这一段给出的证据需要回到原文细读"
+    return f"原文强调的是 {phrase}" if phrase else "这一段给出的证据需要回到原文细读"
 
 
 def _abstract_text(paper: dict[str, Any], reading: PaperReading) -> str:
@@ -2187,7 +2188,7 @@ def _evidence_sentence(reading: PaperReading, fallback: str) -> str:
             keywords.append(token)
     if not keywords:
         return fallback
-    return f"从摘要和图注线索看，论文反复围绕 {', '.join(list(dict.fromkeys(keywords))[:5])} 展开，说明这些量就是阅读时应优先跟踪的主线。"
+    return f"从摘要和图注看，论文反复围绕 {', '.join(list(dict.fromkeys(keywords))[:5])} 展开，说明这些量就是阅读时应优先跟踪的主线。"
 
 
 def _keyword_hits(text: str, candidates: tuple[str, ...]) -> list[str]:
